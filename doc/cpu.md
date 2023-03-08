@@ -22,6 +22,7 @@ All registers are 64 bits wide.
 |------|------------|------------------------------|
 | 0    | interrupt  | enable hardware interrupts   |
 | 1    | supervisor | if CPU is in supervisor mode |
+| 2    | mmu        | if MMU is enabled            |
 
 
 ## Instructions
