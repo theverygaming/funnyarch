@@ -6,7 +6,7 @@ instructions = {
     "nop": [0, 0x01],
     "mov": [2, 0x02],
     "add": [2, 0x03],
-    "jmp": [1, 0x14],
+    "jmp": [1, 0x13],
 }
 
 output = []

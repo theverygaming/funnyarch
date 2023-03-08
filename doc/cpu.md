@@ -60,16 +60,16 @@ control comes first, then source and target operands follow
 | 0x0D  | SAR    | src+tgt  | 8/16/32/64 | arithmetic shift right (sign extension) | user            |
 | 0x0E  | AND    | src+tgt  | 8/16/32/64 | bitwise AND                             | user            |
 | 0x0F  | OR     | src+tgt  | 8/16/32/64 | bitwise OR                              | user            |
-| 0x11  | XOR    | src+tgt  | 8/16/32/64 | bitwise XOR                             | user            |
-| 0x12  | NOT    | src+tgt  | 8/16/32/64 | bitwise NOT                             | user            |
-| 0x13  | TEST   | src+tgt  | 8/16/32/64 | test if bit set                         | user            |
-| 0x14  | JMP    | src      | 64         | absolute jump                           | user            |
-| 0x15  | RJMP   | src      | 64         | relative jump                           | user            |
-| 0x16  | CMP    | src+tgt  | 8/16/32/64 | compare                                 | user            |
-| 0x17  | INT    | src      | 8          | software interrupt                      | user            |
-| 0x18  | IRET   | none     | 64         | return from interrupt                   | supervisor      |
-| 0x19  | WFI    | none     | 64         | wait for interrupt                      | supervisor      |
-| 0x1A  | INVLPG | src      | 64         | flush TLB entry                         | supervisor      |
+| 0x10  | XOR    | src+tgt  | 8/16/32/64 | bitwise XOR                             | user            |
+| 0x11  | NOT    | src+tgt  | 8/16/32/64 | bitwise NOT                             | user            |
+| 0x12  | TEST   | src+tgt  | 8/16/32/64 | test if bit set                         | user            |
+| 0x13  | JMP    | src      | 64         | absolute jump                           | user            |
+| 0x14  | RJMP   | src      | 64         | relative jump                           | user            |
+| 0x15  | CMP    | src+tgt  | 8/16/32/64 | compare                                 | user            |
+| 0x16  | INT    | src      | 8          | software interrupt                      | user            |
+| 0x17  | IRET   | none     | 64         | return from interrupt                   | supervisor      |
+| 0x18  | WFI    | none     | 64         | wait for interrupt                      | supervisor      |
+| 0x19  | INVLPG | src      | 64         | flush TLB entry                         | supervisor      |
 
 
 ### Operation sizes
