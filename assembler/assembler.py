@@ -15,6 +15,7 @@ instructions = {
     "mov": [2, 0x02],
     "add": [2, 0x03],
     "jmp": [1, 0x13],
+    "rjmp": [1, 0x14],
 }
 
 def write_out(bytes, num):

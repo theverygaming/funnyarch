@@ -252,8 +252,6 @@ void cpu::execute() {
     uint8_t target_type = (control >> 11) & 0b11;
     uint8_t condition = (control >> 13) & 0b111;
 
-    fprintf(stderr, "opc: 0x%x op_size: 0x%x source_type: 0x%x target_type: 0x%x condition: 0x%x\n", (unsigned int)opcode, (unsigned int)op_size, (unsigned int)source_type, (unsigned int)target_type, (unsigned int)condition);
-
     ip_mut += 2; // control
 
     if (opcode > OPC_INVLPG || opcode < 0x01) { // invalid opcode
@@ -264,14 +262,15 @@ void cpu::execute() {
         throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 
+    fprintf(stderr, "instr: %s\n", asm_opc_info[opcode].name);
+    fprintf(stderr, "    -> opc: 0x%x op_size: 0x%x source_type: 0x%x target_type: 0x%x condition: 0x%x\n", (unsigned int)opcode, (unsigned int)op_size, (unsigned int)source_type, (unsigned int)target_type, (unsigned int)condition);
+
     uint64_t sourceval = 0;
     if (asm_opc_info[opcode].op_count != 0) {
         sourceval = get_operand_val(&ip_mut, op_size, source_type, true, true);
         next_operand(&ip_mut, op_size, source_type);
+        fprintf(stderr, "    -> source value: 0x%llx\n", sourceval);
     }
-    fprintf(stderr, "    -> source value: 0x%llx\n", sourceval);
-
-    fprintf(stderr, "    -> instr: %s\n", asm_opc_info[opcode].name);
 
     if (false) { // skip
         if (asm_opc_info[opcode].op_count == 2) {
@@ -284,60 +283,77 @@ void cpu::execute() {
     bool set_ip = true;
 
     switch (control & 0b111111111) {
-    case OPC_ALLSIZES(OPC_NOP):
+    case OPC_ALLSIZES(OPC_NOP): {
         break;
+    }
 
     case OPC_ALLSIZES(OPC_MOV): {
         set_operand_val(&ip_mut, op_size, target_type, sourceval);
         break;
     }
-    case OPC_ALLSIZES(OPC_ADD):
+    case OPC_ALLSIZES(OPC_ADD): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_SUB):
+    case OPC_ALLSIZES(OPC_SUB): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_DIV):
+    case OPC_ALLSIZES(OPC_DIV): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_IDIV):
+    case OPC_ALLSIZES(OPC_IDIV): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_MUL):
+    case OPC_ALLSIZES(OPC_MUL): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_IMUL):
+    case OPC_ALLSIZES(OPC_IMUL): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_REM):
+    case OPC_ALLSIZES(OPC_REM): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_IREM):
+    case OPC_ALLSIZES(OPC_IREM): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_SHR):
+    case OPC_ALLSIZES(OPC_SHR): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_SHL):
+    case OPC_ALLSIZES(OPC_SHL): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_SAR):
+    case OPC_ALLSIZES(OPC_SAR): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_AND):
+    case OPC_ALLSIZES(OPC_AND): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_OR):
+    case OPC_ALLSIZES(OPC_OR): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_XOR):
+    case OPC_ALLSIZES(OPC_XOR): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_NOT):
+    case OPC_ALLSIZES(OPC_NOT): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_TEST):
+    case OPC_ALLSIZES(OPC_TEST): {
         break;
+    }
 
     case OPC(OPSIZE64, OPC_JMP): {
         set_ip = false;
@@ -345,23 +361,31 @@ void cpu::execute() {
         break;
     }
 
-    case OPC(OPSIZE64, OPC_RJMP):
+    case OPC(OPSIZE64, OPC_RJMP): {
+        set_ip = false;
+        cpuctx.regs[REG_IP] += (int64_t)sourceval;
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_CMP):
+    case OPC_ALLSIZES(OPC_CMP): {
         break;
+    }
 
-    case OPC(OPSIZE8, OPC_INT):
+    case OPC(OPSIZE8, OPC_INT): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_IRET):
+    case OPC_ALLSIZES(OPC_IRET): {
         break;
+    }
 
-    case OPC_ALLSIZES(OPC_WFI):
+    case OPC_ALLSIZES(OPC_WFI): {
         break;
+    }
 
-    case OPC(OPSIZE64, OPC_INVLPG):
+    case OPC(OPSIZE64, OPC_INVLPG): {
         break;
+    }
 
     default:
         throw cpu_except(cpu_except::etype::INVALIDOPCODE);
