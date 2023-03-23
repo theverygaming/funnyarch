@@ -1,4 +1,12 @@
 import re
+import sys
+
+if len(sys.argv) != 3:
+    print(f"usage: {sys.argv[0]} input output")
+    exit(1)
+
+infile = None
+outfile = None
 
 # instruction format:
 # [number of arguments, opcode]
@@ -9,11 +17,9 @@ instructions = {
     "jmp": [1, 0x13],
 }
 
-output = []
-
 def write_out(bytes, num):
     num &= (1 << (bytes * 8)) - 1
-    output.append(num.to_bytes(bytes, 'little'))
+    outfile.write(num.to_bytes(bytes, 'little'))
 
 def getOperandType(op):
     val = 0
@@ -63,10 +69,10 @@ def parseInstr(line):
     for i in range(instrinfo[0]): # for operands
         val = getOperandType(split[1+i])
         operands.append(val)
-        if i == 0: # source
-            control |= (val[1] << 9) # set source type
         if i == 0: # target
             control |= (val[1] << 11) # set target type
+        if i == 1 or (i == 0 and instrinfo[0] == 1): # source
+            control |= (val[1] << 9) # set source type
     operands.reverse() # in the binary source comes first, in assembly target is first
 
     write_out(2, control) # write control
@@ -75,14 +81,16 @@ def parseInstr(line):
         opsize = 8 # default 64-bit
         if operand[1] <= 1: # register
             opsize = 1
+        print(f"    -> opw s: {opsize} val: {operand[0]:02x}")
         write_out(opsize, operand[0])
 
-f = open("test.asm")
-for line in f.read().splitlines():
-    parseInstr(line.lower())
-f.close()
 
-f = open("out.bin", "wb")
-for byte in output:
-    f.write(byte)
-f.close()
+
+infile = open(sys.argv[1])
+outfile = open(sys.argv[2], "wb")
+
+for line in infile.read().splitlines():
+    parseInstr(line.lower())
+
+infile.close()
+outfile.close()

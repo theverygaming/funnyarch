@@ -5,10 +5,10 @@ All registers are 64 bits wide.
 - **ip**(32): instruction pointer
 - **sp**(33): stack pointer
 - **flags**(34): various CPU state flags (carry etc.)
-- **isp**(35): interrupt stack pointer (supervisor read/write only)
-- **sflags**(36): supervisor flags (interrupt enable etc.) (supervisor read/write only)
-- **ivt**(37): pointer to interrupt vector table (supervisor read/write only)
-- **pd**(38): pointer to page directory (supervisor read/write only)
+- **isp**(35): interrupt stack pointer (supervisor only)
+- **sflags**(36): supervisor flags (interrupt enable etc.) (supervisor only)
+- **ivt**(37): pointer to interrupt vector table (supervisor only)
+- **pd**(38): pointer to page directory (supervisor only)
 
 
 ### flags
@@ -45,7 +45,7 @@ control comes first, then source and target operands follow
 
 | value | name   | operands | op sizes   | description                             | privilege level |
 |-------|--------|----------|------------|-----------------------------------------|-----------------|
-| 0x01  | NOP    | none     | 64         | no operation                            | user            |
+| 0x01  | NOP    | none     | 8/16/32/64 | no operation                            | user            |
 | 0x02  | MOV    | src+tgt  | 8/16/32/64 | move (zero extend by default)           | user            |
 | 0x03  | ADD    | src+tgt  | 8/16/32/64 | add                                     | user            |
 | 0x04  | SUB    | src+tgt  | 8/16/32/64 | subtract                                | user            |
@@ -67,8 +67,8 @@ control comes first, then source and target operands follow
 | 0x14  | RJMP   | src      | 64         | relative jump                           | user            |
 | 0x15  | CMP    | src+tgt  | 8/16/32/64 | compare                                 | user            |
 | 0x16  | INT    | src      | 8          | software interrupt                      | user            |
-| 0x17  | IRET   | none     | 64         | return from interrupt                   | supervisor      |
-| 0x18  | WFI    | none     | 64         | wait for interrupt                      | supervisor      |
+| 0x17  | IRET   | none     | 8/16/32/64 | return from interrupt                   | supervisor      |
+| 0x18  | WFI    | none     | 8/16/32/64 | wait for interrupt                      | supervisor      |
 | 0x19  | INVLPG | src      | 64         | flush TLB entry                         | supervisor      |
 
 
