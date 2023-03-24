@@ -45,6 +45,7 @@ control comes first, then source and target operands follow
 
 | value | name   | operands | op sizes   | description                             | privilege level |
 |-------|--------|----------|------------|-----------------------------------------|-----------------|
+| 0x00  | UD     | none     | 8/16/32/64 | undefined instruction                   | /               |
 | 0x01  | NOP    | none     | 8/16/32/64 | no operation                            | user            |
 | 0x02  | MOV    | src+tgt  | 8/16/32/64 | move (zero extend by default)           | user            |
 | 0x03  | ADD    | src+tgt  | 8/16/32/64 | add                                     | user            |
