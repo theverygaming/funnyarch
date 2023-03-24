@@ -144,24 +144,7 @@ def writeInstr(name, instruction):
         write_out(opsize, instruction.tgt)
 
 
-def asminstr0(str, inst=None):
-    if inst == None:
-        inst = assembled_instr()
-    split = str.split(".")
-
-    if split[0] not in instructions:
-        raise Exception(f"invalid instruction {split[0]}")
-
-    instinfo = instructions[split[0]]
-
-    inst.opcode = instinfo.opcode
-    inst.operandcount = 0
-    if len(split) == 2:
-        inst.opsize = opsizemap[split[1]]
-    writeInstr(split[0], inst)
-
-
-def asminstr1(str, inst=None, split=None):
+def assemble_instr(str, operandcount, inst=None, split=None):
     if split == None:
         split = re.split(r" |, ", str)
     if inst == None:
@@ -174,35 +157,19 @@ def asminstr1(str, inst=None, split=None):
     instinfo = instructions[splitinst[0]]
 
     inst.opcode = instinfo.opcode
-    inst.operandcount = 1
+    inst.operandcount = operandcount
     if len(splitinst) == 2:
         inst.opsize = opsizemap[splitinst[1]]
-    inst.src, inst.srctype = getOperandType(split[1])
+
+    if operandcount == 1:
+        inst.src, inst.srctype = getOperandType(split[1])
+    elif operandcount == 2:
+        inst.src, inst.srctype = getOperandType(split[2])
+        inst.tgt, inst.tgttype = getOperandType(split[1])
     writeInstr(splitinst[0], inst)
 
 
-def asminstr2(str, inst=None, split=None):
-    if split == None:
-        split = re.split(r" |, ", str)
-    if inst == None:
-        inst = assembled_instr()
-    splitinst = split[0].split(".")
-
-    if splitinst[0] not in instructions:
-        raise Exception(f"invalid instruction {splitinst[0]}")
-
-    instinfo = instructions[splitinst[0]]
-
-    inst.opcode = instinfo.opcode
-    inst.operandcount = 2
-    if len(splitinst) == 2:
-        inst.opsize = opsizemap[splitinst[1]]
-    inst.src, inst.srctype = getOperandType(split[2])
-    inst.tgt, inst.tgttype = getOperandType(split[1])
-    writeInstr(splitinst[0], inst)
-
-
-def asmcinstr_base(str):
+def assemble_cond_instr(str):
     inst = assembled_instr()
     split = re.split(r" |, ", str)
     if split[0] not in conditionmap:
@@ -210,21 +177,6 @@ def asmcinstr_base(str):
     inst.condition = conditionmap[split[0]]
     split.remove(split[0])
     return split[0], inst, split
-
-
-def asmcinstr0(str):
-    a1, a2, a3 = asmcinstr_base(str)
-    asminstr0(a1, a2)
-
-
-def asmcinstr1(str):
-    a1, a2, a3 = asmcinstr_base(str)
-    asminstr1(a1, a2, a3)
-
-
-def asmcinstr2(str):
-    a1, a2, a3 = asmcinstr_base(str)
-    asminstr2(a1, a2, a3)
 
 
 rg_singledirective = r"^\.(global|string|byte)(?!:).*"  # matches ".directive"
@@ -243,17 +195,22 @@ def assembleinstr(str):
     elif re.match(rg_label, str):
         print("    -> label")
     elif re.match(rg_instr0, str):
-        asminstr0(str)
+        assemble_instr(str, 0)
     elif re.match(rg_instr1, str):
-        asminstr1(str)
+        assemble_instr(str, 1)
     elif re.match(rg_instr2, str):
-        asminstr2(str)
+        assemble_instr(str, 2)
     elif re.match(rg_cinstr0, str):
-        asmcinstr0(str)
+        a1, a2, a3 = assemble_cond_instr(str)
+        assemble_instr(a1, 0, a2, a3)
     elif re.match(rg_cinstr1, str):
-        asmcinstr1(str)
+        a1, a2, a3 = assemble_cond_instr(str)
+        assemble_instr(a1, 1, a2, a3)
     elif re.match(rg_cinstr2, str):
-        asmcinstr2(str)
+        a1, a2, a3 = assemble_cond_instr(str)
+        assemble_instr(a1, 2, a2, a3)
+    else:
+        raise Exception(f"invalid: {str}")
 
 
 def isvalidasm(str):
