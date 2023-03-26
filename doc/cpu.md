@@ -2,13 +2,13 @@
 
 All registers are 64 bits wide.
 - **r0-r31**: general purpose
-- **ip**(32): instruction pointer
-- **sp**(33): stack pointer
-- **flags**(34): various CPU state flags (carry etc.)
-- **isp**(35): interrupt stack pointer (supervisor only)
-- **sflags**(36): supervisor flags (interrupt enable etc.) (supervisor only)
-- **ivt**(37): pointer to interrupt vector table (supervisor only)
-- **pd**(38): pointer to page directory (supervisor only)
+- **rip**(r32): instruction pointer
+- **rsp**(r33): stack pointer
+- **rflags**(r34): various CPU state flags (carry etc.)
+- **risp**(r35): interrupt stack pointer (supervisor only)
+- **rsflags**(r36): supervisor flags (interrupt enable etc.) (supervisor only)
+- **rivt**(r37): pointer to interrupt vector table (supervisor only)
+- **rpd**(r38): pointer to page directory (supervisor only)
 
 
 ### flags

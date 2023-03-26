@@ -1,13 +1,6 @@
 import re
 import sys
 
-if len(sys.argv) != 3:
-    print(f"usage: {sys.argv[0]} input output")
-    exit(1)
-
-infile = None
-outfile = None
-
 
 class instruction:
     def __init__(self, name, operandcount, opcode, sizelist):
@@ -63,6 +56,16 @@ conditionmap = {
     "ifzoc": 6,
 }
 
+specialregsmap = {
+    "rip": 32,
+    "rsp": 33,
+    "rflags": 34,
+    "risp": 35,
+    "rsflags": 36,
+    "rivt": 37,
+    "rpd": 38,
+}
+
 
 class assembled_instr:
     def __init__(self):
@@ -76,33 +79,114 @@ class assembled_instr:
         self.condition = conditionmap["always"]
 
 
+class relocation:
+    def __init__(self, symname, valueloc, valuesizebytes, relloc, isrelative):
+        self.symname = symname
+        self.valueloc = valueloc
+        self.valuesizebytes = valuesizebytes
+        self.relloc = relloc
+        self.isrelative = isrelative
+
+
+class symbol:
+    def __init__(self, symname, location):
+        self.symname = symname
+        self.location = location
+
+
+# globals
+outfile = None
+
+origin = 0
+relocations = []
+symbols = []
+
+
 def write_out(bytes, num):
     num &= (1 << (bytes * 8)) - 1
     outfile.write(num.to_bytes(bytes, "little"))
 
 
-def getOperandType(op):
+def getOperandType(op, is_target_op, instinfo, inst):
     val = 0
     optype = 0
+
+    def getopsizebytes():
+        return int(
+            int(list(opsizemap.keys())[list(opsizemap.values()).index(inst.opsize)]) / 8
+        )
+
+    def getoperandinfo(isptr):
+        skipbytes = 2
+        valuesize = 0
+        if is_target_op:
+            if inst.srctype <= 1:  # register (8 bit)
+                skipbytes += 1
+            elif inst.srctype == 3:
+                skipbytes += 8
+            elif inst.srctype == 2:
+                skipbytes += getopsizebytes()
+        if isptr:
+            valuesize = 8
+        else:
+            valuesize = getopsizebytes()
+        return (outfile.tell() + skipbytes), valuesize
+
+    def addreloc(name, isptr, isrel):
+        valueloc, valuesize = getoperandinfo(isptr)
+        relocations.append(relocation(name, valueloc, valuesize, outfile.tell(), isrel))
+
+    def parseop(str, isptr):
+        rval = 0
+        isreg = False
+        rstr = re.sub(".rel$", "", str)
+        if any(x for x in symbols if x.symname == rstr):
+            addreloc(rstr, isptr, str.endswith(".rel"))
+        elif str[0] == "r":
+            isreg = True
+            if str in specialregsmap:
+                rval = specialregsmap[str]
+            else:
+                rval = int(str.strip("r"), 0)
+            if rval > 38:
+                raise Exception(f"invalid register r{rval}")
+        else:
+            rval = int(str, 0)
+        return isreg, rval
+
     if len(op) == 0:
         raise Exception(f"invalid: {op}")
     if op.startswith("[") and op.endswith("]"):  # pointer
         str = op.strip("[]")
         if len(str) == 0:
             raise Exception(f"invalid: {op}")
-        if str[0] == "r":
+        isreg, val = parseop(str, True)
+        if isreg:
             optype = 1  # register pointer
-            val = int(str.strip("r"), 0)
         else:
             optype = 3  # immediate pointer
-            val = int(str, 0)
-    elif op[0] == "r":
-        optype = 0  # register
-        val = int(op.strip("r"))
     else:
-        optype = 2  # immediate
-        val = int(op, 0)
+        isreg, val = parseop(op, False)
+        if isreg:
+            optype = 0  # register
+        else:
+            optype = 2  # immediate
     return val, optype
+
+
+def relocate():
+    for reloc in relocations:
+        symbol = [x for x in symbols if x.symname == reloc.symname][0]
+        symloc = symbol.location + origin
+        relocval = 0
+        if reloc.isrelative:
+            relocval = symloc - (reloc.relloc + origin)
+        else:
+            relocval = symloc
+        oldpos = outfile.tell()
+        outfile.seek(reloc.valueloc)
+        write_out(reloc.valuesizebytes, relocval)
+        outfile.seek(oldpos)
 
 
 def writeInstr(name, instruction):
@@ -162,10 +246,10 @@ def assemble_instr(str, operandcount, inst=None, split=None):
         inst.opsize = opsizemap[splitinst[1]]
 
     if operandcount == 1:
-        inst.src, inst.srctype = getOperandType(split[1])
+        inst.src, inst.srctype = getOperandType(split[1], False, instinfo, inst)
     elif operandcount == 2:
-        inst.src, inst.srctype = getOperandType(split[2])
-        inst.tgt, inst.tgttype = getOperandType(split[1])
+        inst.src, inst.srctype = getOperandType(split[2], False, instinfo, inst)
+        inst.tgt, inst.tgttype = getOperandType(split[1], True, instinfo, inst)
     writeInstr(splitinst[0], inst)
 
 
@@ -179,21 +263,35 @@ def assemble_cond_instr(str):
     return split[0], inst, split
 
 
-rg_singledirective = r"^\.(global|string|byte)(?!:).*"  # matches ".directive"
-rg_label = r"^[a-z.][A-Za-z0-9]*:$"  # matches "label:"
+def parse_assembler_directive(str):
+    split = re.split(r" ", str)
+    if split[0] == ".origin":
+        global origin
+        origin = int(split[1], 0)
+
+
+def parse_assembler_label(str):
+    split = re.split(r":", str)
+    if any(x for x in symbols if x.symname == split[0]):
+        raise Exception(f"double symbol {split[0]}")
+    symbols.append(symbol(split[0], outfile.tell()))
+
+
+rg_directive = r"^\.(export|extern|string|byte|origin)(?!:).*"  # matches ".directive"
+rg_label = r"^[A-Za-z0-9_.][A-Za-z0-9_.]*:$"  # matches "label:"
 rg_instr0 = r"^[a-z][a-z]*(\.8|\.16|\.32|\.64)*$"  # matches "instr(.nn)"
-rg_instr1 = r"^(?!(if(z|c|nz|nc|nzc|oc|zoc)))[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9\[\]]*[a-z0-9\[\]]$"  # matches "instr(.nn) src"
-rg_instr2 = r"^[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9\[\]]*, [a-z0-9\[\]]*$"  # matches "instr(.nn) tgt, src"
+rg_instr1 = r"^(?!(if(z|c|nz|nc|nzc|oc|zoc)))[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9-_.\[\]]*[a-z0-9-_.\[\]]$"  # matches "instr(.nn) src"
+rg_instr2 = r"^[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9\[\]]*, [a-z0-9-_.\[\]]*$"  # matches "instr(.nn) tgt, src"
 rg_cinstr0 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z0-9]*( |\.8|\.16|\.32|\.64)*$"  # matches "cond instr(.nn)"
-rg_cinstr1 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9\[\]]*[a-z0-9\[\]]$"  # matches "cond instr(.nn) src"
-rg_cinstr2 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9\[\]]*, [a-z0-9\[\]]*$"  # matches "cond instr(.nn) tgt, src"
+rg_cinstr1 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9-_.\[\]]*[a-z0-9-_.\[\]]$"  # matches "cond instr(.nn) src"
+rg_cinstr2 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9-_.\[\]]*, [a-z0-9-_.\[\]]*$"  # matches "cond instr(.nn) tgt, src"
 
 
 def assembleinstr(str):
-    if re.match(rg_singledirective, str):
-        print("    -> single")
+    if re.match(rg_directive, str):
+        parse_assembler_directive(str)
     elif re.match(rg_label, str):
-        print("    -> label")
+        parse_assembler_label(str)
     elif re.match(rg_instr0, str):
         assemble_instr(str, 0)
     elif re.match(rg_instr1, str):
@@ -215,7 +313,7 @@ def assembleinstr(str):
 
 def isvalidasm(str):
     return (
-        re.match(rg_singledirective, str)
+        re.match(rg_directive, str)
         or re.match(rg_label, str)
         or re.match(rg_instr0, str)
         or re.match(rg_instr1, str)
@@ -254,6 +352,10 @@ def preprocess(str):
     return str
 
 
+if len(sys.argv) != 3:
+    print(f"usage: {sys.argv[0]} input output")
+    exit(1)
+
 infile = open(sys.argv[1])
 
 outfile = open(sys.argv[2], "wb")
@@ -265,5 +367,7 @@ for line in infilec.splitlines():
     if len(line) == 0:
         continue
     assembleinstr(line)
+
+relocate()
 
 outfile.close()
