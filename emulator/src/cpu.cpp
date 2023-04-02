@@ -2,11 +2,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include <unistd.h>
 #include <utility>
 
 #include "cpu.h"
 #include "mem.h"
+#include "tools.h"
+
+// #define ISDEBUG
+
+#ifdef ISDEBUG
+#define DEBUG_PRINTF(...) fprintf(stderr, __VA_ARGS__)
+#else
+#define DEBUG_PRINTF(...) \
+    do {                  \
+    } while (0)
+#endif
 
 #define ARRLEN(x) (sizeof(x) / sizeof(x[0]))
 
@@ -15,7 +27,17 @@ cpu::cpu_except::cpu_except(etype e) {
 }
 
 const char *cpu::cpu_except::what() const noexcept {
-    return "CPU exception";
+    switch (_e) {
+    case etype::PAGEFAULT:
+        return "CPU exception - page fault";
+    case etype::PROTECTIONFAULT:
+        return "CPU exception - protection fault";
+    case etype::INVALIDOPCODE:
+        return "CPU exception - invalid opcode";
+    case etype::DIVIDEBYZERO:
+        return "CPU exception - divide by zero";
+    }
+    return "unknown CPU exception";
 }
 
 struct cpu::cpu cpu::cpuctx;
@@ -106,6 +128,26 @@ static const unsigned int asm_op_sizes[]{
     [3] = 8,
 };
 
+static bool shouldexecute(uint8_t condition) {
+    switch (condition) {
+    case 0: // always
+        return true;
+    case 1: // ifz
+        return (cpu::cpuctx.regs[REG_FLAGS] & 0b10) != 0;
+    case 2: // ifnz
+        return (cpu::cpuctx.regs[REG_FLAGS] & 0b10) == 0;
+    case 3: // ifc
+        return (cpu::cpuctx.regs[REG_FLAGS] & 0b01) != 0;
+    case 4: // ifnc
+        return (cpu::cpuctx.regs[REG_FLAGS] & 0b01) == 0;
+    case 5: // ifnzc
+        return (cpu::cpuctx.regs[REG_FLAGS] & 0b11) == 0;
+    case 6: // ifzoc
+        return (cpu::cpuctx.regs[REG_FLAGS] & 0b11) != 0;
+    }
+    return true;
+}
+
 static void next_operand(uint64_t *ip, uint8_t opsize, uint8_t optype) {
     switch (optype) {
     case 0:
@@ -125,22 +167,22 @@ static uint64_t get_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, bo
     uint64_t val;
 
     if (optype <= 1) { // register
-        val = mem::read_mem<uint8_t>(*ip);
+        val = mem::read<uint8_t>(*ip);
     } else if (optype == 3) { // immediate pointer
-        val = mem::read_mem<uint64_t>(*ip);
+        val = mem::read<uint64_t>(*ip);
     } else { // immediate
         switch (opsize) {
         case 0:
-            val = mem::read_mem<uint8_t>(*ip);
+            val = mem::read<uint8_t>(*ip);
             break;
         case 1:
-            val = mem::read_mem<uint16_t>(*ip);
+            val = mem::read<uint16_t>(*ip);
             break;
         case 2:
-            val = mem::read_mem<uint32_t>(*ip);
+            val = mem::read<uint32_t>(*ip);
             break;
         case 3:
-            val = mem::read_mem<uint64_t>(*ip);
+            val = mem::read<uint64_t>(*ip);
             break;
         }
     }
@@ -155,16 +197,16 @@ static uint64_t get_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, bo
     if ((optype == 3 || optype == 1) && derefptr) { // pointer
         switch (opsize) {
         case 0:
-            val = mem::read_mem<uint8_t>(val);
+            val = mem::read<uint8_t>(val);
             break;
         case 1:
-            val = mem::read_mem<uint16_t>(val);
+            val = mem::read<uint16_t>(val);
             break;
         case 2:
-            val = mem::read_mem<uint32_t>(val);
+            val = mem::read<uint32_t>(val);
             break;
         case 3:
-            val = mem::read_mem<uint64_t>(val);
+            val = mem::read<uint64_t>(val);
             break;
         }
     }
@@ -183,15 +225,17 @@ static void set_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, uint64
     uint64_t val;
 
     if (optype <= 1) { // register
-        val = mem::read_mem<uint8_t>(*ip);
+        val = mem::read<uint8_t>(*ip);
     } else if (optype == 3) { // immediate pointer
-        val = mem::read_mem<uint64_t>(*ip);
+        val = mem::read<uint64_t>(*ip);
     } else { // immediate
+        DEBUG_PRINTF("can't write to immediate\n");
         throw cpu::cpu_except(cpu::cpu_except::etype::INVALIDOPCODE);
     }
 
     if (optype <= 1) {
         if (val >= ARRLEN(cpu::cpuctx.regs)) {
+            DEBUG_PRINTF("invalid register\n");
             throw cpu::cpu_except(cpu::cpu_except::etype::INVALIDOPCODE);
         }
     }
@@ -212,16 +256,16 @@ static void set_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, uint64
     if ((optype == 3 || optype == 1)) { // pointer
         switch (opsize) {
         case 0:
-            mem::write_mem<uint8_t>(val, setval & sizemask);
+            mem::write<uint8_t>(val, setval & sizemask);
             break;
         case 1:
-            mem::write_mem<uint16_t>(val, setval & sizemask);
+            mem::write<uint16_t>(val, setval & sizemask);
             break;
         case 2:
-            mem::write_mem<uint32_t>(val, setval & sizemask);
+            mem::write<uint32_t>(val, setval & sizemask);
             break;
         case 3:
-            mem::write_mem<uint64_t>(val, setval & sizemask);
+            mem::write<uint64_t>(val, setval & sizemask);
             break;
         }
     }
@@ -243,9 +287,10 @@ static void set_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, uint64
 /* clang-format on */
 
 void cpu::execute() {
-    uint64_t ip_mut = cpuctx.regs[REG_IP];
+    const uint64_t ip_current = cpuctx.regs[REG_IP];
+    uint64_t ip_mut = ip_current;
 
-    uint16_t control = mem::read_mem<uint16_t>(cpuctx.regs[REG_IP]);
+    uint16_t control = mem::read<uint16_t>(cpuctx.regs[REG_IP]);
     uint8_t opcode = control & ((1UL << 7) - 1);
     uint8_t op_size = (control >> 7) & 0b11;
     uint8_t source_type = (control >> 9) & 0b11;
@@ -254,7 +299,8 @@ void cpu::execute() {
 
     ip_mut += 2; // control
 
-    if (opcode > OPC_INVLPG || opcode < 0x01) { // invalid opcode
+    if ((opcode > OPC_INVLPG || opcode < 0x01) || (condition > 6)) { // invalid opcode
+        DEBUG_PRINTF("unknown opcode\n");
         throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 
@@ -262,25 +308,30 @@ void cpu::execute() {
         throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 
-    fprintf(stderr, "instr: %s\n", asm_opc_info[opcode].name);
-    fprintf(stderr, "    -> opc: 0x%x op_size: 0x%x source_type: 0x%x target_type: 0x%x condition: 0x%x\n", (unsigned int)opcode, (unsigned int)op_size, (unsigned int)source_type, (unsigned int)target_type, (unsigned int)condition);
+    DEBUG_PRINTF("instr: %s\n", asm_opc_info[opcode].name);
+    DEBUG_PRINTF("    -> opc: 0x%x op_size: 0x%x source_type: 0x%x target_type: 0x%x condition: 0x%x\n", (unsigned int)opcode, (unsigned int)op_size, (unsigned int)source_type, (unsigned int)target_type, (unsigned int)condition);
+
+    uint64_t ip_next = ip_mut;
+
+    if (asm_opc_info[opcode].op_count != 0) {
+        next_operand(&ip_next, op_size, source_type);
+
+        if (asm_opc_info[opcode].op_count == 2) {
+            next_operand(&ip_next, op_size, target_type);
+        }
+    }
 
     uint64_t sourceval = 0;
     if (asm_opc_info[opcode].op_count != 0) {
         sourceval = get_operand_val(&ip_mut, op_size, source_type, true, true);
         next_operand(&ip_mut, op_size, source_type);
-        fprintf(stderr, "    -> source value: 0x%llx\n", sourceval);
+        DEBUG_PRINTF("    -> source value: 0x%llx\n", sourceval);
     }
 
-    if (false) { // skip
-        if (asm_opc_info[opcode].op_count == 2) {
-            next_operand(&ip_mut, op_size, target_type);
-        }
-        cpuctx.regs[REG_IP] = ip_mut;
+    if (!shouldexecute(condition)) {
+        cpuctx.regs[REG_IP] = ip_next;
         return;
     }
-
-    bool set_ip = true;
 
     switch (control & 0b111111111) {
     case OPC_ALLSIZES(OPC_NOP): {
@@ -291,11 +342,22 @@ void cpu::execute() {
         set_operand_val(&ip_mut, op_size, target_type, sourceval);
         break;
     }
+
     case OPC_ALLSIZES(OPC_ADD): {
+        // TODO: incomplete
+        uint64_t result;
+        uint64_t val2 = get_operand_val(&ip_mut, op_size, target_type, true, true);
+        __builtin_add_overflow(val2, sourceval, &result);
+        set_operand_val(&ip_mut, op_size, target_type, result);
         break;
     }
 
     case OPC_ALLSIZES(OPC_SUB): {
+        // TODO: incomplete
+        uint64_t result;
+        uint64_t val2 = get_operand_val(&ip_mut, op_size, target_type, true, true);
+        __builtin_sub_overflow(val2, sourceval, &result); // dest - src
+        set_operand_val(&ip_mut, op_size, target_type, result);
         break;
     }
 
@@ -356,18 +418,19 @@ void cpu::execute() {
     }
 
     case OPC(OPSIZE64, OPC_JMP): {
-        set_ip = false;
         cpuctx.regs[REG_IP] = sourceval;
-        break;
+        return;
     }
 
     case OPC(OPSIZE64, OPC_RJMP): {
-        set_ip = false;
-        cpuctx.regs[REG_IP] += (int64_t)sourceval;
-        break;
+        cpuctx.regs[REG_IP] = ip_current + (int64_t)sourceval;
+        return;
     }
 
     case OPC_ALLSIZES(OPC_CMP): {
+        // TODO: incomplete
+        uint64_t tgt = get_operand_val(&ip_mut, op_size, target_type, true, true);
+        bitset(&cpuctx.regs[REG_FLAGS], 1, tgt == 0);
         break;
     }
 
@@ -388,23 +451,11 @@ void cpu::execute() {
     }
 
     default:
+        DEBUG_PRINTF("unknown opcode size\n");
         throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 
-    if (asm_opc_info[opcode].op_count == 2) {
-        next_operand(&ip_mut, op_size, target_type);
-    }
-
-    /*uint64_t destop = 0;
-    if (asm_opc_info[opcode].op_count == 2) {
-        destop = get_operand_val(&ip_mut, op_size, target_type);
-        next_operand(&ip_mut, op_size, target_type);
-    }
-    fprintf(stderr, "    -> dest value: 0x%llx\n", destop);*/
-
-    if (set_ip) {
-        cpuctx.regs[REG_IP] = ip_mut;
-    }
+    cpuctx.regs[REG_IP] = ip_next;
 }
 
 const char *cpudesc::regnames[39] = {
@@ -440,11 +491,11 @@ const char *cpudesc::regnames[39] = {
     "r29",
     "r30",
     "r31",
-    "ip",
-    "sp",
-    "flags",
-    "isp",
-    "sflags",
-    "ivt",
-    "pd",
+    "rip",
+    "rsp",
+    "rflags",
+    "risp",
+    "rsflags",
+    "rivt",
+    "rpd",
 };

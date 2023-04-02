@@ -56,7 +56,39 @@ conditionmap = {
     "ifzoc": 6,
 }
 
-specialregsmap = {
+regmap = {
+    "r0": 0,
+    "r1": 1,
+    "r2": 2,
+    "r3": 3,
+    "r4": 4,
+    "r5": 5,
+    "r6": 6,
+    "r7": 7,
+    "r8": 8,
+    "r9": 9,
+    "r10": 10,
+    "r11": 11,
+    "r12": 12,
+    "r13": 13,
+    "r14": 14,
+    "r15": 15,
+    "r16": 16,
+    "r17": 17,
+    "r18": 18,
+    "r19": 19,
+    "r20": 20,
+    "r21": 21,
+    "r22": 22,
+    "r23": 23,
+    "r24": 24,
+    "r25": 25,
+    "r26": 26,
+    "r27": 27,
+    "r28": 28,
+    "r29": 29,
+    "r30": 30,
+    "r31": 31,
     "rip": 32,
     "rsp": 33,
     "rflags": 34,
@@ -139,19 +171,14 @@ def getOperandType(op, is_target_op, instinfo, inst):
     def parseop(str, isptr):
         rval = 0
         isreg = False
-        rstr = re.sub(".rel$", "", str)
-        if any(x for x in symbols if x.symname == rstr):
-            addreloc(rstr, isptr, str.endswith(".rel"))
-        elif str[0] == "r":
+        if str in regmap:
             isreg = True
-            if str in specialregsmap:
-                rval = specialregsmap[str]
-            else:
-                rval = int(str.strip("r"), 0)
-            if rval > 38:
-                raise Exception(f"invalid register r{rval}")
+            rval = regmap[str]
+        elif str[0] == "#":
+            rval = int(str[1:], 0)
         else:
-            rval = int(str, 0)
+            rstr = re.sub(".rel$", "", str)
+            addreloc(rstr, isptr, str.endswith(".rel"))
         return isreg, rval
 
     if len(op) == 0:
@@ -176,6 +203,8 @@ def getOperandType(op, is_target_op, instinfo, inst):
 
 def relocate():
     for reloc in relocations:
+        if not any([x for x in symbols if x.symname == reloc.symname]):
+            raise Exception(f"invalid symbol {reloc.symname}")
         symbol = [x for x in symbols if x.symname == reloc.symname][0]
         symloc = symbol.location + origin
         relocval = 0
@@ -219,13 +248,16 @@ def writeInstr(name, instruction):
         opsize = opsizen
         if instruction.srctype <= 1:  # register
             opsize = 1
+        if instruction.srctype == 3:  # immediate pointer
+            opsize = 8
         write_out(opsize, instruction.src)
-
-    if instruction.operandcount == 2:
-        opsize = opsizen
-        if instruction.tgttype <= 1:  # register
-            opsize = 1
-        write_out(opsize, instruction.tgt)
+        if instruction.operandcount == 2:
+            opsize = opsizen
+            if instruction.tgttype <= 1:  # register
+                opsize = 1
+            if instruction.tgttype == 3:  # immediate pointer
+                opsize = 8
+            write_out(opsize, instruction.tgt)
 
 
 def assemble_instr(str, operandcount, inst=None, split=None):
@@ -268,6 +300,11 @@ def parse_assembler_directive(str):
     if split[0] == ".origin":
         global origin
         origin = int(split[1], 0)
+    elif split[0] == ".string":
+        outfile.write(bytes(str[len(split[0]) + 1 :].replace('"', ""), "ascii"))
+        write_out(1, 0)  # null terminator
+    else:
+        raise Exception(f"unsupported: {split[0]}")
 
 
 def parse_assembler_label(str):
@@ -280,11 +317,11 @@ def parse_assembler_label(str):
 rg_directive = r"^\.(export|extern|string|byte|origin)(?!:).*"  # matches ".directive"
 rg_label = r"^[A-Za-z0-9_.][A-Za-z0-9_.]*:$"  # matches "label:"
 rg_instr0 = r"^[a-z][a-z]*(\.8|\.16|\.32|\.64)*$"  # matches "instr(.nn)"
-rg_instr1 = r"^(?!(if(z|c|nz|nc|nzc|oc|zoc)))[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9-_.\[\]]*[a-z0-9-_.\[\]]$"  # matches "instr(.nn) src"
-rg_instr2 = r"^[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9\[\]]*, [a-z0-9-_.\[\]]*$"  # matches "instr(.nn) tgt, src"
+rg_instr1 = r"^(?!(if(z|c|nz|nc|nzc|oc|zoc)))[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9#-_.\[\]]*[a-z0-9#-_.\[\]]$"  # matches "instr(.nn) src"
+rg_instr2 = r"^[a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9#-_.\[\]]*, [a-z0-9#-_.\[\]]*$"  # matches "instr(.nn) tgt, src"
 rg_cinstr0 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z0-9]*( |\.8|\.16|\.32|\.64)*$"  # matches "cond instr(.nn)"
-rg_cinstr1 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9-_.\[\]]*[a-z0-9-_.\[\]]$"  # matches "cond instr(.nn) src"
-rg_cinstr2 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9-_.\[\]]*, [a-z0-9-_.\[\]]*$"  # matches "cond instr(.nn) tgt, src"
+rg_cinstr1 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9#-_.\[\]]*[a-z0-9#-_.\[\]]$"  # matches "cond instr(.nn) src"
+rg_cinstr2 = r"^if(z|c|nz|nc|nzc|oc|zoc) [a-z]*( |\.8|\.16|\.32|\.64) *[a-z0-9#-_.\[\]]*, [a-z0-9#-_.\[\]]*$"  # matches "cond instr(.nn) tgt, src"
 
 
 def assembleinstr(str):
@@ -308,7 +345,7 @@ def assembleinstr(str):
         a1, a2, a3 = assemble_cond_instr(str)
         assemble_instr(a1, 2, a2, a3)
     else:
-        raise Exception(f"invalid: {str}")
+        raise Exception(f"invalid instruction: {str}")
 
 
 def c_comment_remover(text):  # https://stackoverflow.com/a/241506
@@ -451,6 +488,10 @@ for line in infilec.splitlines():
         print(f"{e}\n{line}")
         exit(1)
 
-relocate()
+try:
+    relocate()
+except Exception as e:
+    print(f"error resolving symbols: {e}")
+    exit(1)
 
 outfile.close()

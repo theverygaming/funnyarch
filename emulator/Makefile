@@ -5,7 +5,8 @@ LDFLAGS += `$(SDL2_CONFIG) --libs`
 
 CXXFILES = src/main.cpp \
 		   src/cpu.cpp \
-		   src/mem.cpp 
+		   src/mem.cpp \
+		   src/sdl.cpp
 
 OBJS = $(addsuffix .o, $(basename $(CXXFILES)))
 

@@ -2,7 +2,7 @@
 
 All registers are 64 bits wide.
 - **r0-r31**: general purpose
-- **rip**(r32): instruction pointer
+- **rip**(r32): instruction pointer - when accessed contains a pointer to the beginning of the _next_ instruction
 - **rsp**(r33): stack pointer
 - **rflags**(r34): various CPU state flags (carry etc.)
 - **risp**(r35): interrupt stack pointer (supervisor only)
