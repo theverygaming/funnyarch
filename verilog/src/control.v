@@ -48,8 +48,16 @@ module control (
           6'h00: begin  /* NOP */
             state <= `STATE_FETCH;
           end
-          6'h01: begin  /* JMP(E5) */
-            regarr[30] <= regarr[instr[13:9]];
+          6'h01: begin  /* STRPI(E2) */
+            if (instr[31] == 0) begin
+              regarr[instr[18:14]] <= regarr[instr[18:14]] + {20'b0, instr[30:19]};
+              address = regarr[instr[18:14]] + {20'b0, instr[30:19]};
+            end else begin
+              regarr[instr[18:14]] <= regarr[instr[18:14]] + {20'hfffff, instr[30:19]};
+              address = regarr[instr[18:14]] + {20'hfffff, instr[30:19]};
+            end
+            data_rw <= 1;
+            data_out <= regarr[instr[13:9]];
             state <= `STATE_FETCH;
           end
           6'h02: begin  /* JMP(E4) */
@@ -95,6 +103,17 @@ module control (
             address = regarr[instr[18:14]];
             data_rw <= 1;
             data_out <= regarr[instr[13:9]];
+            state <= `STATE_FETCH;
+          end
+          6'h0a: begin  /* JAL(E4) */
+            regarr[28] <= regarr[30];
+            regarr[30] <= {7'b0, instr[31:9], 2'b0};
+            state <= `STATE_FETCH;
+          end
+          6'h0b: begin  /* RJAL(E4) */
+            regarr[28] <= regarr[30];
+            if (instr[31] == 0) regarr[30] <= regarr[30] + {8'b0, instr[30:9], 2'b0};
+            else regarr[30] <= regarr[30] + {8'hff, instr[30:9], 2'b0};
             state <= `STATE_FETCH;
           end
           6'h10: begin  /* ADD(E1) */
@@ -147,35 +166,35 @@ module control (
       $display("CPU: writeback");
       case (instr[5:0])
         6'h06: begin  /* LDR(E2) */
-          regarr[instr[18:14]] = data_in;
+          regarr[instr[18:14]] <= data_in;
           state <= `STATE_FETCH;
         end
         6'h07: begin  /* LDRI(E2) */
-          regarr[instr[18:14]] = data_in;
+          regarr[instr[18:14]] <= data_in;
           state <= `STATE_FETCH;
         end
         6'h10: begin  /* ADD(E1) */
-          regarr[instr[23:19]] = alu_out;
+          regarr[instr[23:19]] <= alu_out;
           state <= `STATE_FETCH;
         end
         6'h11: begin  /* ADD(E2) */
-          regarr[instr[18:14]] = alu_out;
+          regarr[instr[18:14]] <= alu_out;
           state <= `STATE_FETCH;
         end
         6'h12: begin  /* ADD(E3) */
-          regarr[instr[13:9]] = alu_out;
+          regarr[instr[13:9]] <= alu_out;
           state <= `STATE_FETCH;
         end
         6'h13: begin  /* SUB(E1) */
-          regarr[instr[23:19]] = alu_out;
+          regarr[instr[23:19]] <= alu_out;
           state <= `STATE_FETCH;
         end
         6'h14: begin  /* SUB(E2) */
-          regarr[instr[18:14]] = alu_out;
+          regarr[instr[18:14]] <= alu_out;
           state <= `STATE_FETCH;
         end
         6'h15: begin  /* SUB(E3) */
-          regarr[instr[13:9]] = alu_out;
+          regarr[instr[13:9]] <= alu_out;
           state <= `STATE_FETCH;
         end
         default: begin  /* invalid opcode */

@@ -9,4 +9,4 @@ verilator --top-module cpu -O3 --trace -cc src/*.v --exe tests/*.cpp # trace
 make -j$(nproc) -C obj_dir -f Vcpu.mk Vcpu
 echo "running"
 ./obj_dir/Vcpu
-gtkwave waveform.vcd
+#gtkwave waveform.vcd
