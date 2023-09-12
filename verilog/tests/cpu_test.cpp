@@ -54,6 +54,9 @@ int main(int argc, char **argv, char **env) {
                     cpu->rootp->cpu__DOT__ctrl__DOT__regarr[4],
                     cpu->rootp->cpu__DOT__ctrl__DOT__regarr[29],
                     cpu->rootp->cpu__DOT__ctrl__DOT__regarr[28]);
+            if ((cpu->address & 0b11) != 0) {
+                fprintf(stderr, "unaligned access @0x%x\n", cpu->address);
+            }
 #endif
 
             if (cpu->data_rw == 1) {
