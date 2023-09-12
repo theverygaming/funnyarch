@@ -1,5 +1,6 @@
 #include "Vcpu.h"
 #include "Vcpu___024root.h"
+#include "sdl_class.h"
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -9,11 +10,14 @@
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
+#define GRAPHICS
 #define TRACE
 
 int main(int argc, char **argv, char **env) {
     Vcpu *cpu = new Vcpu;
-
+#ifdef GRAPHICS
+    SDL sdl;
+#endif
 #ifdef TRACE
     Verilated::traceEverOn(true);
     VerilatedVcdC *m_trace = new VerilatedVcdC;
@@ -36,23 +40,25 @@ int main(int argc, char **argv, char **env) {
     inf.close();
 
     // for (t = 0; t < ((4) * (2 * 4)) + (4); t++) {
-    for (t = 0; t < 5000; t++) {
+    // for (t = 0; t < 100; t++) {
+    for (t = 0; true; t++) {
         cpu->clk ^= 1;
 
         if (cpu->clk == 1) {
 #ifdef TRACE
-            printf("r1: 0x%x r2: 0x%x r3: 0x%x r4: 0x%x rsp: 0x%x lr: 0x%x\n",
-                   cpu->rootp->cpu__DOT__ctrl__DOT__regarr[1],
-                   cpu->rootp->cpu__DOT__ctrl__DOT__regarr[2],
-                   cpu->rootp->cpu__DOT__ctrl__DOT__regarr[3],
-                   cpu->rootp->cpu__DOT__ctrl__DOT__regarr[4],
-                   cpu->rootp->cpu__DOT__ctrl__DOT__regarr[29],
-                   cpu->rootp->cpu__DOT__ctrl__DOT__regarr[28]);
+            fprintf(stderr,
+                    "r1: 0x%x r2: 0x%x r3: 0x%x r4: 0x%x rsp: 0x%x lr: 0x%x\n",
+                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[1],
+                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[2],
+                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[3],
+                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[4],
+                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[29],
+                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[28]);
 #endif
 
             if (cpu->data_rw == 1) {
 #ifdef TRACE
-                printf("mem write A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
+                fprintf(stderr, "mem write A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
 #endif
                 if (cpu->address >= 10000 - 4) {
                     break;
@@ -61,6 +67,11 @@ int main(int argc, char **argv, char **env) {
                 mem[cpu->address + 1] = (cpu->data >> 8) & 0xFF;
                 mem[cpu->address + 2] = (cpu->data >> 16) & 0xFF;
                 mem[cpu->address + 3] = (cpu->data >> 24) & 0xFF;
+                if (cpu->address == 0x1000) {
+                    for (int i = 0; i < 4; i++) {
+                        printf("%c", mem[cpu->address + i]);
+                    }
+                }
             } else {
                 if (cpu->address >= 10000 - 4) {
                     break;
@@ -69,7 +80,7 @@ int main(int argc, char **argv, char **env) {
                                   ((uint32_t)mem[cpu->address + 2] << 16) | ((uint32_t)mem[cpu->address + 3] << 24);
                 cpu->data = data;
 #ifdef TRACE
-                printf("mem read A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
+                fprintf(stderr, "mem read A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
 #endif
             }
         }
@@ -77,15 +88,25 @@ int main(int argc, char **argv, char **env) {
 
         cpu->eval();
 #ifdef TRACE
-        printf("\n");
+        fprintf(stderr, "\n");
         m_trace->dump(t);
+#endif
+#ifdef GRAPHICS
+        if (t % 100 == 0) {
+            sdl.redraw(mem, 10000);
+        }
 #endif
     }
     auto end = std::chrono::high_resolution_clock::now();
     double hz = (1 / (((double)std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / t) / (1000000000)));
-    printf("simulation ran at %fMHz", hz / 1000000);
+    fprintf(stderr, "simulation ran at %fMHz", hz / 1000000);
 #ifdef TRACE
     m_trace->close();
+#endif
+#ifdef GRAPHICS
+    while (true) {
+        sdl.update();
+    }
 #endif
     delete cpu;
     exit(EXIT_SUCCESS);

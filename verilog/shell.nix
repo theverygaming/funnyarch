@@ -9,6 +9,8 @@ stdenv.mkDerivation {
     gtkwave
     yosys
 
+    SDL2
+
     python311
   ];
 }

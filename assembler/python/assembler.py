@@ -211,7 +211,6 @@ def get_operand_type(opstr):
             rval = re.sub(".rel$", "", str)
             islabel = not str.endswith(".rel")
             isrellabel = str.endswith(".rel")
-            # addreloc(rstr, isptr, str.endswith(".rel"))
         return isreg, islabel, isrellabel, rval
 
     if len(opstr) == 0:
@@ -257,7 +256,11 @@ def relocate():
             relocval = symloc - (reloc.valueloc + origin + 4)
         else:
             relocval = symloc
-        relocval = int(relocval / 4) # depends on instruction..
+        # FIXME: this is just a quick hack
+        if not reloc.symname.startswith("nodiv"):
+            relocval = int(relocval / 4) # depends on instruction..
+            print("reloc div")
+        print(f"reloc sym: {reloc.symname} val: {relocval}")
         oldpos = outfile.tell()
         outfile.seek(reloc.valueloc)
         value = read_out(4)
@@ -397,13 +400,14 @@ def parse_assembler_label(match):
 rg_arg = r"[A-Za-z0-9#\-_.]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
-rg_directive = r"^\.(export|extern|string|byte|origin)(?!:).*"  # matches ".directive"
+rg_directive = r"^\.(export|extern|string|byte|origin)(?!:).*$"  # matches ".directive"
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 
 
 def assembleinstr(str):
     if re.match(rg_directive, str) is not None:
         parse_assembler_directive(str)
+        return
     elif re.match(rg_label, str) is not None:
         parse_assembler_label(re.match(rg_label, str))
         return
