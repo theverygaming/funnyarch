@@ -1,4 +1,5 @@
-.vscode/
+/.vscode/
 *.o
 
-emulator/emu
+/emulator/emu
+/verilog/obj_dir
