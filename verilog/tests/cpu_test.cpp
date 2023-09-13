@@ -97,7 +97,7 @@ int main(int argc, char **argv, char **env) {
         m_trace->dump(t);
 #endif
 #ifdef GRAPHICS
-        if (t % 100000 == 0) {
+        if (t % 400000 == 0) {
             sdl.redraw(mem, memsize);
             if (!sdl.update()) {
                 break;
