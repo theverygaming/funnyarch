@@ -35,9 +35,29 @@
 | 30     | 31:0 | rip  | Instruction pointer             |
 | 31     | 31:0 | rf   | CPU flags register              |
 
+### rf (flags register)
+
+| bits | description |
+| ---- | ----------- |
+| 0    | carry flag  |
+| 1    | zero flag   |
+| 31:2 | reserved    |
+
 ## Instruction encoding
 
-All instructions are 32 bits in length
+All instructions are 32 bits in length. They can all be executed conditionally
+
+### Condition codes
+
+| value | name         | operation    | operation                                        |
+| ----- | ------------ | ------------ | ------------------------------------------------ |
+| 0     | always       | unconditinal | always execute                                   |
+| 1     | ifz/ifeq     | tgt == src   | execute if zero flag is set                      |
+| 2     | ifnz/ifneq   | tgt != src   | execute if zero flag is not set                  |
+| 3     | ifc/iflt     | tgt < src    | execute if carry flag is set                     |
+| 4     | ifnc/ifgteq  | tgt >= src   | execute if carry flag is not set                 |
+| 5     | ifnzc/ifgt   | tgt > src    | execute if both carry and zero flags are not set |
+| 6     | ifzoc/iflteq | tgt <= src   | execute if zero flag or carry flag is set        |
 
 ### E1
 
@@ -136,6 +156,8 @@ Assembler syntax: `cond instr tgt, src`
 | 0x09   | stri  | [E2](#e2) | 2            | mem[target]=source then target+=imm13 (imm13 is two's complement)                     |
 | 0x0a   | jal   | [E4](#e4) | 2            | jump to address in imm23<<2 and store pointer to next instr in lr                     |
 | 0x0b   | rjal  | [E4](#e4) | 2            | add imm23<<2 to rip (imm23 is two's complement) and store pointer to next instr in lr |
+| 0x0c   | cmp   | [E7](#e7) | 3            | perform operation target-source and update flags accordingly                          |
+| 0x0d   | cmp   | [E3](#e3) | 3            | perform operation imm16-target and update flags accordingly                           |
 |        |       |           |              |                                                                                       |
 | 0x10   | add   | [E1](#e1) | 3            | target=source1+source2                                                                |
 | 0x11   | add   | [E2](#e2) | 3            | target=source+imm13                                                                   |
@@ -146,7 +168,8 @@ Assembler syntax: `cond instr tgt, src`
 | 0x15   | sub   | [E3](#e3) | 3            | target=target-imm16 - target=target-(imm16<<16) if bit 14 set                         |
 
 <!-- TODO: fix this  -->
-## assembler instructions 
+
+## pseudoinstructions
 
 | opcode | name | encoding  | clock cycles | operation                                       |
 | ------ | ---- | --------- | ------------ | ----------------------------------------------- |

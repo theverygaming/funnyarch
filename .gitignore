@@ -1,5 +1,11 @@
 /.vscode/
 *.o
+*.bin
+
+*.vcd
 
 /emulator/emu
 /verilog/obj_dir
+__pycache__/
+
+/verilog/output.txt

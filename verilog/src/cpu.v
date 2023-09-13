@@ -7,6 +7,7 @@ module cpu (
 );
   wire [3:0] alu_opcode;
   wire [31:0] alu_in1, alu_in2, alu_out;
+  wire alu_carry, alu_zero;
 
   control ctrl (
       clk,
@@ -18,12 +19,16 @@ module cpu (
       alu_opcode,
       alu_in1,
       alu_in2,
-      alu_out
+      alu_out,
+      alu_carry,
+      alu_zero
   );
   alu alu (
       alu_opcode,
       alu_in1,
       alu_in2,
-      alu_out
+      alu_out,
+      alu_carry,
+      alu_zero
   );
 endmodule

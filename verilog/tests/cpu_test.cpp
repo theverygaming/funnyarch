@@ -11,7 +11,7 @@
 #include <verilated_vcd_c.h>
 
 #define GRAPHICS
-#define TRACE
+// #define TRACE
 
 int main(int argc, char **argv, char **env) {
     Vcpu *cpu = new Vcpu;
@@ -29,9 +29,11 @@ int main(int argc, char **argv, char **env) {
     auto start = std::chrono::high_resolution_clock::now();
     vluint64_t t;
     std::ifstream inf("output.bin", std::ios::binary);
-    unsigned char *mem = new unsigned char[10000];
-    memset(mem, 0, 10000);
-    for (size_t i = 0; i < 10000; i++) {
+    std::ofstream outf("output.txt");
+    size_t memsize = (640 * 480) / 8;
+    unsigned char *mem = new unsigned char[memsize];
+    memset(mem, 0, memsize);
+    for (size_t i = 0; i < memsize; i++) {
         inf.read((char *)&mem[i], sizeof(mem[i]));
         if (!inf.good()) {
             break;
@@ -46,14 +48,6 @@ int main(int argc, char **argv, char **env) {
 
         if (cpu->clk == 1) {
 #ifdef TRACE
-            fprintf(stderr,
-                    "r1: 0x%x r2: 0x%x r3: 0x%x r4: 0x%x rsp: 0x%x lr: 0x%x\n",
-                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[1],
-                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[2],
-                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[3],
-                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[4],
-                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[29],
-                    cpu->rootp->cpu__DOT__ctrl__DOT__regarr[28]);
             if ((cpu->address & 0b11) != 0) {
                 fprintf(stderr, "unaligned access @0x%x\n", cpu->address);
             }
@@ -63,25 +57,20 @@ int main(int argc, char **argv, char **env) {
 #ifdef TRACE
                 fprintf(stderr, "mem write A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
 #endif
-                if (cpu->address >= 10000 - 4) {
+                if (cpu->address >= memsize - 4) {
                     break;
                 }
-                mem[cpu->address + 0] = (cpu->data >> 0) & 0xFF;
-                mem[cpu->address + 1] = (cpu->data >> 8) & 0xFF;
-                mem[cpu->address + 2] = (cpu->data >> 16) & 0xFF;
-                mem[cpu->address + 3] = (cpu->data >> 24) & 0xFF;
+                *(uint32_t *)&mem[cpu->address] = cpu->data; // TODO: endianness
                 if (cpu->address == 0x1000) {
-                    for (int i = 0; i < 4; i++) {
-                        printf("%c", mem[cpu->address + i]);
-                    }
+                    outf.write((const char *)&mem[cpu->address], 1);
+                    printf("%c", mem[cpu->address]);
+                    fprintf(stderr, "OUTPUT CHAR: %c\n", mem[cpu->address]);
                 }
             } else {
-                if (cpu->address >= 10000 - 4) {
+                if (cpu->address >= memsize - 4) {
                     break;
                 }
-                vluint32_t data = ((uint32_t)mem[cpu->address + 0] << 0) | ((uint32_t)mem[cpu->address + 1] << 8) |
-                                  ((uint32_t)mem[cpu->address + 2] << 16) | ((uint32_t)mem[cpu->address + 3] << 24);
-                cpu->data = data;
+                cpu->data = *(uint32_t *)&mem[cpu->address]; // TODO: endianness
 #ifdef TRACE
                 fprintf(stderr, "mem read A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
 #endif
@@ -91,24 +80,44 @@ int main(int argc, char **argv, char **env) {
 
         cpu->eval();
 #ifdef TRACE
-        fprintf(stderr, "\n");
+        if (cpu->rootp->cpu__DOT__ctrl__DOT__state == 0 && cpu->clk == 1) {
+            if (cpu->rootp->cpu__DOT__ctrl__DOT__state == 0) {
+                fprintf(stderr,
+                        "r1: 0x%x r2: 0x%x r3: 0x%x r4: 0x%x rsp: 0x%x lr: 0x%x rf: 0x%x\n",
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[01],
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[02],
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[03],
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[04],
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[29],
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[28],
+                        cpu->rootp->cpu__DOT__ctrl__DOT__regarr[31]);
+            }
+            fprintf(stderr, "\n");
+        }
         m_trace->dump(t);
 #endif
 #ifdef GRAPHICS
-        if (t % 100 == 0) {
-            sdl.redraw(mem, 10000);
+        if (t % 100000 == 0) {
+            sdl.redraw(mem, memsize);
+            if (!sdl.update()) {
+                break;
+            }
         }
 #endif
     }
     auto end = std::chrono::high_resolution_clock::now();
     double hz = (1 / (((double)std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / t) / (1000000000)));
     fprintf(stderr, "simulation ran at %fMHz", hz / 1000000);
+    outf.close();
 #ifdef TRACE
     m_trace->close();
 #endif
+    fprintf(stderr, "r10: 0x%x \n", cpu->rootp->cpu__DOT__ctrl__DOT__regarr[10]);
 #ifdef GRAPHICS
     while (true) {
-        sdl.update();
+        if (!sdl.update()) {
+            break;
+        }
     }
 #endif
     delete cpu;

@@ -11,6 +11,11 @@ static inline void put_pixel(SDL_Surface *surface, int x, int y, uint8_t r, uint
     *((uint32_t *)((uint8_t *)surface->pixels + y * surface->pitch + x * surface->format->BytesPerPixel)) = pixel;
 }
 
+static inline void put_pixel_bw(SDL_Surface *surface, int x, int y, bool set) {
+    uint32_t pixel = set ? UINT32_MAX : 0;
+    *((uint32_t *)((uint8_t *)surface->pixels + y * surface->pitch + x * surface->format->BytesPerPixel)) = pixel;
+}
+
 class SDL {
 public:
     SDL() {
@@ -19,40 +24,37 @@ public:
         surface = SDL_GetWindowSurface(sdlwin);
     }
 
-    void update() {
+    bool update() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) {
-                exit(0);
+                return false;
             }
         }
 
         SDL_UpdateWindowSurface(sdlwin);
+        return true;
     }
 
     void redraw(void *buf, size_t buf_size) {
         for (size_t y = 0; y < height; y++) {
-            for (size_t x = 0; x < width; x++) {
-                size_t bit = (y * width) + x;
-                size_t byte = bit / 8;
-                size_t byte_off = bit % 8;
-                if (byte >= buf_size) {
+            for (size_t x = 0; x < width / 8; x++) {
+                size_t idx = (y * (width / 8)) + x;
+                if (idx >= buf_size) {
                     break;
                 }
-                if ((((uint8_t *)buf)[byte] & (1 << byte_off)) != 0) {
-                    put_pixel(surface, x, y, 255, 255, 255, 255);
-                } else {
-                    put_pixel(surface, x, y, 0, 0, 0, 255);
+                uint8_t byte = ((uint8_t *)buf)[idx];
+                for (int i = 0; i < 8; i++) {
+                    put_pixel_bw(surface, (x * 8) + i, y, (byte & (1 << i)) != 0);
                 }
             }
         }
-        update();
     }
 
 private:
     SDL_Window *sdlwin;
     SDL_Surface *surface;
 
-    int width = 640;
-    int height = 480;
+    unsigned width = 640;
+    unsigned height = 480;
 };

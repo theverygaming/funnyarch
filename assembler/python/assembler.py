@@ -1,6 +1,8 @@
+import os
 import re
 import sys
 from enum import Enum
+import preprocessor
 
 
 class InstructionType(Enum):
@@ -53,10 +55,14 @@ class OperandType(Enum):
 
 
 class Instruction:
-    def __init__(self, type, opcode, operands):
-        self.type = type
+    def __init__(self, type, opcode, operands=None, relsymimm=False, divsymimm=False):
+        self.type = type  # instruction encoding type
         self.opcode = opcode
-        self.operands = operands
+        self.operands = operands  # instruction operand types as array
+        self.relsymimm = relsymimm  # if label immediate should be relative
+        self.divsymimm = divsymimm  # if label immediate should be divided by 4
+        if self.operands is None:
+            self.operands = get_op_types(self.type)
 
 
 def get_op_types(instrtype):
@@ -78,35 +84,39 @@ def get_op_types(instrtype):
 
 instructions = {
     # real instructions
-    "nop": [Instruction(InstructionType.E6, 0x00, get_op_types(InstructionType.E6))],
+    "nop": [Instruction(InstructionType.E6, 0x00)],
     "jmp": [
-        Instruction(InstructionType.E4, 0x02, get_op_types(InstructionType.E4)),
+        Instruction(InstructionType.E4, 0x02, divsymimm=True),
     ],
-    "rjmp": [Instruction(InstructionType.E4, 0x03, get_op_types(InstructionType.E4))],
+    "rjmp": [Instruction(InstructionType.E4, 0x03, relsymimm=True, divsymimm=True)],
     "mov": [
-        Instruction(InstructionType.E7, 0x04, get_op_types(InstructionType.E7)),
-        Instruction(InstructionType.E3, 0x05, get_op_types(InstructionType.E3)),
+        Instruction(InstructionType.E7, 0x04),
+        Instruction(InstructionType.E3, 0x05),
     ],
-    "ldr": [Instruction(InstructionType.E2, 0x06, get_op_types(InstructionType.E2))],
-    "ldri": [Instruction(InstructionType.E2, 0x07, get_op_types(InstructionType.E2))],
-    "str": [Instruction(InstructionType.E2, 0x08, get_op_types(InstructionType.E2))],
-    "stri": [Instruction(InstructionType.E2, 0x09, get_op_types(InstructionType.E2))],
-    "strpi": [Instruction(InstructionType.E2, 0x01, get_op_types(InstructionType.E2))],
+    "ldr": [Instruction(InstructionType.E2, 0x06)],
+    "ldri": [Instruction(InstructionType.E2, 0x07)],
+    "str": [Instruction(InstructionType.E2, 0x08)],
+    "stri": [Instruction(InstructionType.E2, 0x09)],
+    "strpi": [Instruction(InstructionType.E2, 0x01)],
     "jal": [
-        Instruction(InstructionType.E4, 0x0a, get_op_types(InstructionType.E4)),
+        Instruction(InstructionType.E4, 0x0A, divsymimm=True),
     ],
     "rjal": [
-        Instruction(InstructionType.E4, 0x0b, get_op_types(InstructionType.E4)),
+        Instruction(InstructionType.E4, 0x0B, relsymimm=True, divsymimm=True),
+    ],
+    "cmp": [
+        Instruction(InstructionType.E7, 0x0C),
+        Instruction(InstructionType.E3, 0x0D),
     ],
     "add": [
-        Instruction(InstructionType.E1, 0x10, get_op_types(InstructionType.E1)),
-        Instruction(InstructionType.E2, 0x11, get_op_types(InstructionType.E2)),
-        Instruction(InstructionType.E3, 0x12, get_op_types(InstructionType.E3)),
+        Instruction(InstructionType.E1, 0x10),
+        Instruction(InstructionType.E2, 0x11),
+        Instruction(InstructionType.E3, 0x12),
     ],
     "sub": [
-        Instruction(InstructionType.E1, 0x13, get_op_types(InstructionType.E1)),
-        Instruction(InstructionType.E2, 0x14, get_op_types(InstructionType.E2)),
-        Instruction(InstructionType.E3, 0x15, get_op_types(InstructionType.E3)),
+        Instruction(InstructionType.E1, 0x13),
+        Instruction(InstructionType.E2, 0x14),
+        Instruction(InstructionType.E3, 0x15),
     ],
     # pseudoinstructions
 }
@@ -114,11 +124,17 @@ instructions = {
 conditionmap = {
     "always": 0,
     "ifz": 1,
+    "ifeq": 1,
     "ifnz": 2,
+    "ifneq": 2,
     "ifc": 3,
+    "iflt": 3,
     "ifnc": 4,
+    "ifgteq": 4,
     "ifnzc": 5,
+    "ifgt": 5,
     "ifzoc": 6,
+    "iflteq": 6,
 }
 
 regmap = {
@@ -167,10 +183,11 @@ class AssembledInstr:
 
 
 class Relocation:
-    def __init__(self, symname, valueloc, isrelative, shift_offset, bits):
+    def __init__(self, symname, valueloc, isrelative, divideval, shift_offset, bits):
         self.symname = symname
         self.valueloc = valueloc
         self.isrelative = isrelative
+        self.divideval = divideval  # if symbol value should be divided by 4
         self.shift_offset = shift_offset
         self.bits = bits
 
@@ -192,9 +209,18 @@ symbols = []
 def read_out(bytes):
     return int.from_bytes(outfile.read(bytes), "little", signed=False)
 
+
 def write_out(bytes, num):
     num &= (1 << (bytes * 8)) - 1
     outfile.write(num.to_bytes(bytes, "little"))
+
+
+def align_outfile(alignment):
+    n = 4 - (outfile.tell() % alignment)
+    if n == 4:
+        n = 0
+    for _ in range(n):
+        write_out(1, ord("f"))
 
 
 def get_operand_type(opstr):
@@ -248,7 +274,7 @@ def get_operand_type(opstr):
 def relocate():
     for reloc in relocations:
         if not any([x for x in symbols if x.symname == reloc.symname]):
-            raise Exception(f"invalid symbol {reloc.symname}")
+            raise Exception(f'invalid symbol "{reloc.symname}"')
         symbol = [x for x in symbols if x.symname == reloc.symname][0]
         symloc = symbol.location + origin
         relocval = 0
@@ -256,17 +282,19 @@ def relocate():
             relocval = symloc - (reloc.valueloc + origin + 4)
         else:
             relocval = symloc
-        # FIXME: this is just a quick hack
-        if not reloc.symname.startswith("nodiv"):
-            relocval = int(relocval / 4) # depends on instruction..
+        if reloc.divideval:
+            relocval = int(relocval / 4)  # depends on instruction..
             print("reloc div")
         print(f"reloc sym: {reloc.symname} val: {relocval}")
         oldpos = outfile.tell()
         outfile.seek(reloc.valueloc)
         value = read_out(4)
         mask = (1 << reloc.bits) - 1
-        value = (value & ~(mask << reloc.shift_offset)) | ((relocval & mask) << reloc.shift_offset)
+        value = (value & ~(mask << reloc.shift_offset)) | (
+            (relocval & mask) << reloc.shift_offset
+        )
         outfile.seek(reloc.valueloc)
+        # FIXME: check if value actually fits
         write_out(4, value)
         outfile.seek(oldpos)
 
@@ -321,6 +349,7 @@ def write_instr(instr):
     else:
         raise Exception(f"UNSUPPORTED {instr.type}")
 
+    align_outfile(4)
     write_out(4, instrword)
 
 
@@ -369,7 +398,10 @@ def assemble_instr(match):
                 Relocation(
                     v[0],
                     outfile.tell(),
-                    v[1] == OperandType.rellabel, shift_offset, bits
+                    v[1] == OperandType.rellabel or instinfo.relsymimm,
+                    instinfo.divsymimm,
+                    shift_offset,
+                    bits,
                 )
             )
 
@@ -382,9 +414,16 @@ def parse_assembler_directive(str):
     if split[0] == ".origin":
         global origin
         origin = int(split[1], 0)
-    elif split[0] == ".string":
-        outfile.write(bytes(str[len(split[0]) + 1 :].replace('"', ""), "ascii"))
-        write_out(1, 0)  # null terminator
+    elif split[0] == ".string" or split[0] == ".ascii":
+        assert str[len(split[0]) + 1] == '"', 'string must be enclosed in ""'
+        assert str[len(str) - 2] == '"', 'string must be enclosed in ""'
+        outfile.write(bytes(str[len(split[0]) + 2 : len(str) - 2], "ascii"))
+        if split[0] == ".string":
+            write_out(1, 0)  # null terminator
+    elif split[0] == ".byte":
+        write_out(1, int(split[1], 0))
+    elif split[0] == ".align":
+        align_outfile(int(split[1], 0))
     else:
         raise Exception(f"unsupported: {split[0]}")
 
@@ -400,7 +439,9 @@ def parse_assembler_label(match):
 rg_arg = r"[A-Za-z0-9#\-_.]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
-rg_directive = r"^\.(export|extern|string|byte|origin)(?!:).*$"  # matches ".directive"
+rg_directive = (
+    r"^\.(export|extern|string|ascii|byte|origin|align)(?!:).*$"  # matches ".directive"
+)
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 
 
@@ -417,136 +458,21 @@ def assembleinstr(str):
     assemble_instr(match)
 
 
-def c_comment_remover(text):  # https://stackoverflow.com/a/241506
-    def replacer(match):
-        s = match.group(0)
-        if s.startswith("/"):
-            return " "
-        else:
-            return s
-
-    pattern = re.compile(
-        r'//.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"',
-        re.DOTALL | re.MULTILINE,
-    )
-    return re.sub(pattern, replacer, text)
-
-
-def rmspaces(str):
-    parts = re.split(r"""("[^"]*"|'[^']*')""", str)
-    parts[::2] = map(lambda s: " ".join(s.split()), parts[::2])  # outside quotes
-    return " ".join(parts)
-
-
-def resolvemacros(str, macros_c):
-    class macro_c:
-        def __init__(self, name, args, content):
-            self.name = name
-            self.args = args  # [""]
-            self.content = content
-
-    mcount = 0
-    lines = []
-    macros_s = []
-
-    ismacro = False
-    for line in str.splitlines():
-        line = rmspaces(line)
-        if ismacro:
-            if line[-1] == "\\":
-                line = line[:-1] + "\n"
-            else:
-                ismacro = False
-            macros_s[-1] += line
-            continue
-        else:
-            split = re.split(r" ", line)
-            if split[0] == "#define":
-                if line[-1] == "\\":
-                    line = line[:-1] + "\n"
-                    ismacro = True
-                macros_s.append(line)
-                continue
-        lines.append(line)
-
-    for macro in macros_s:
-        rg_macargs = r"(#define ([A-Za-z0-9._]*)\((([A-Za-z0-9]*(, )?)*)\) )(.*)"
-        rg_macnoargs = r"(#define ([A-Za-z0-9._]*) )(.*)"
-        if re.match(rg_macargs, macro, flags=re.DOTALL):
-            content = re.sub(rg_macargs, r"\6", macro, flags=re.DOTALL)
-            name = re.sub(rg_macargs, r"\2", macro, flags=re.DOTALL)
-            args = re.split(r", ", re.sub(rg_macargs, r"\3", macro, flags=re.DOTALL))
-            macros_c.append(macro_c(name, args, content))
-        elif re.match(rg_macnoargs, macro, flags=re.DOTALL):
-            content = re.sub(rg_macnoargs, r"\3", macro, flags=re.DOTALL)
-            name = re.sub(rg_macnoargs, r"\2", macro, flags=re.DOTALL)
-            macros_c.append(macro_c(name, [], content))
-        else:
-            raise Exception(f"invalid macro definition {macro}")
-
-    for i, line in enumerate(lines):
-        if len(line) == 0:
-            continue
-        for macro in macros_c:
-            rg_macargs = r"\((([a-z0-9-_. \[\]]*(, )?)*)\)$"
-            if re.match(macro.name + rg_macargs, line):
-                if len(macro.args) == 0:
-                    raise Exception(f"invalid use of macro {macro.name}: {line}")
-                mcount += 1
-                args = re.sub(macro.name + rg_macargs, r"\1", line).split(", ")
-                if len(macro.args) != len(args):
-                    raise Exception(f"invalid macro argc {line}")
-
-                s_margs, s_args = zip(
-                    *sorted(
-                        zip(macro.args, args), key=lambda n: len(n[0]), reverse=True
-                    )
-                )
-
-                lines[i] = macro.content
-                for j, arg in enumerate(s_args):
-                    lines[i] = lines[i].replace(s_margs[j], arg)
-
-            elif macro.name == line:
-                if len(macro.args) != 0:
-                    raise Exception(f"invalid use of macro {macro.name}: {line}")
-                mcount += 1
-                lines[i] = macro.content
-
-    str = "\n".join(lines)
-    return mcount, str
-
-
-def preprocess(str):
-    macros_c = []
-    while True:
-        mcount, str = resolvemacros(str, macros_c)
-        if mcount == 0:
-            break
-
-    lines = str.splitlines()
-    for i, line in enumerate(lines):
-        lines[i] = rmspaces(line)
-    str = "\n".join(lines)
-
-    return str
-
-
 if len(sys.argv) != 3:
     print(f"usage: {sys.argv[0]} input output")
     exit(1)
 
 infile = open(sys.argv[1])
+with open(sys.argv[1]) as infile:
+    try:
+        infilec = preprocessor.preprocess(
+            infile.read(), os.path.dirname(os.path.realpath(sys.argv[1]))
+        )
+    except Exception as e:
+        print(f"preprocessor error: {e}")
+        exit(1)
 
 outfile = open(sys.argv[2], "w+b")
-infilec = c_comment_remover(infile.read())
-infile.close()
-
-try:
-    infilec = preprocess(infilec)
-except Exception as e:
-    print(f"preprocessor error: {e}")
-    exit(1)
 
 for line in infilec.splitlines():
     if len(line) == 0:

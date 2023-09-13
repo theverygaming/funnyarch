@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-python3 ../assembler/python/assembler.py ../test.asm output.bin
+python3 ../assembler/python/assembler.py ../asm_tests/main.asm output.bin
 
 #rm -rf ./obj_dir
 verilator --top-module cpu -O3 --trace -cc src/*.v --exe tests/*.cpp --CFLAGS "`sdl2-config --cflags`" --LDFLAGS "`sdl2-config --libs`" # trace
