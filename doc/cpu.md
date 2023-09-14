@@ -159,13 +159,22 @@ Assembler syntax: `cond instr tgt, src`
 | 0x0c   | cmp   | [E7](#e7) | 3            | perform operation target-source and update flags accordingly                          |
 | 0x0d   | cmp   | [E3](#e3) | 3            | perform operation imm16-target and update flags accordingly                           |
 |        |       |           |              |                                                                                       |
-| 0x10   | add   | [E1](#e1) | 3            | target=source1+source2                                                                |
-| 0x11   | add   | [E2](#e2) | 3            | target=source+imm13                                                                   |
-| 0x12   | add   | [E3](#e3) | 3            | target=target+imm16 - target=target+(imm16<<16) if bit 14 set                         |
+| 0x10   | add   | [E1](#e1) | 3            | target = source1 + source2                                                            |
+| 0x11   | add   | [E2](#e2) | 3            | target = source + imm13                                                               |
+| 0x12   | add   | [E3](#e3) | 3            | target = target + imm16 - target = target + (imm16<<16) if bit 14 set                 |
 |        |       |           |              |                                                                                       |
-| 0x13   | sub   | [E1](#e1) | 3            | target=source1-source2                                                                |
-| 0x14   | sub   | [E2](#e2) | 3            | target=source-imm13                                                                   |
-| 0x15   | sub   | [E3](#e3) | 3            | target=target-imm16 - target=target-(imm16<<16) if bit 14 set                         |
+| 0x13   | sub   | [E1](#e1) | 3            | target = source1 - source2                                                            |
+| 0x14   | sub   | [E2](#e2) | 3            | target = source - imm13                                                               |
+| 0x15   | sub   | [E3](#e3) | 3            | target = target - imm16 - target = target - (imm16 << 16) if bit 14 set               |
+|        |       |           |              |                                                                                       |
+| 0x16   | shl   | [E1](#e1) | 3            | target = source1 << source2                                                           |
+| 0x17   | shl   | [E2](#e2) | 3            | target = source << imm13                                                              |
+|        |       |           |              |                                                                                       |
+| 0x18   | shr   | [E1](#e1) | 3            | target = source1 >> source2                                                           |
+| 0x19   | shr   | [E2](#e2) | 3            | target = source >> imm13                                                              |
+|        |       |           |              |                                                                                       |
+| 0x1A   | sar   | [E1](#e1) | 3            | target = source1 >>> source2                                                          |
+| 0x1B   | sar   | [E2](#e2) | 3            | target = source >>> imm13                                                             |
 
 <!-- TODO: fix this  -->
 

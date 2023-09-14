@@ -174,6 +174,42 @@ module control (
             alu_opcode <= 4'h2;
             state <= `STATE_WRITEBACK;
           end
+          6'h16: begin  /* SHL(E1) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= regarr[instr[18:14]];
+            alu_opcode <= 4'h3;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h17: begin  /* SHL(E2) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= {19'b0, instr[31:19]};
+            alu_opcode <= 4'h3;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h18: begin  /* SHR(E1) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= regarr[instr[18:14]];
+            alu_opcode <= 4'h4;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h19: begin  /* SHR(E2) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= {19'b0, instr[31:19]};
+            alu_opcode <= 4'h4;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h1A: begin  /* SAR(E1) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= regarr[instr[18:14]];
+            alu_opcode <= 4'h5;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h1B: begin  /* SAR(E2) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= {19'b0, instr[31:19]};
+            alu_opcode <= 4'h5;
+            state <= `STATE_WRITEBACK;
+          end
           default: begin  /* invalid opcode */
             state <= `STATE_FETCH;
           end
@@ -225,6 +261,30 @@ module control (
         end
         6'h15: begin  /* SUB(E3) */
           regarr[instr[13:9]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h16: begin  /* SHL(E1) */
+          regarr[instr[23:19]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h17: begin  /* SHL(E2) */
+          regarr[instr[18:14]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h18: begin  /* SHR(E1) */
+          regarr[instr[23:19]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h19: begin  /* SHR(E2) */
+          regarr[instr[18:14]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h1A: begin  /* SAR(E1) */
+          regarr[instr[23:19]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h1B: begin  /* SAR(E2) */
+          regarr[instr[18:14]] <= alu_out;
           state <= `STATE_FETCH;
         end
         default: begin  /* invalid opcode */

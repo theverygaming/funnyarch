@@ -13,7 +13,7 @@ mov r0, str_mainruns
 mov r1, #0
 rcall(testresult)
 rcall(alltests)
-rcall(drawchar)
+//rcall(drawchar)
 pop(lr)
 jmp #0xFFFF
 
@@ -23,11 +23,12 @@ defstr(str_mainruns, "main runs")
 
 drawchar:
 mov r10, #0
-mov r4, #0x500
+mov r4, code_end
 mov r1, r4
 mov r2, font8x8
 .drawchar_p1:
 ldr r3, r2, #0
+ldr r5, r1, #0
 str r1, r3, #0
 add r1, #80
 add r2, #1
@@ -37,6 +38,12 @@ ifgteq add r4, #1
 ifgteq mov r1, r4
 ifgteq mov r2, font8x8
 ifgteq add r10, #1
+/*cmp r4, #0x3c4c
+ifgteq mov r4, code_end
+ifgteq mov r1, r4
+ifgteq mov r2, font8x8*/
 rjmp .drawchar_p1
 
 ret()
+
+code_end:

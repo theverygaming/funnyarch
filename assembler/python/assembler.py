@@ -118,6 +118,18 @@ instructions = {
         Instruction(InstructionType.E2, 0x14),
         Instruction(InstructionType.E3, 0x15),
     ],
+    "shl": [
+        Instruction(InstructionType.E1, 0x16),
+        Instruction(InstructionType.E2, 0x17),
+    ],
+    "shr": [
+        Instruction(InstructionType.E1, 0x18),
+        Instruction(InstructionType.E2, 0x19),
+    ],
+    "sar": [
+        Instruction(InstructionType.E1, 0x1A),
+        Instruction(InstructionType.E2, 0x1B),
+    ],
     # pseudoinstructions
 }
 

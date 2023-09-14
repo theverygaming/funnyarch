@@ -49,7 +49,7 @@ ifgt rjmp .cmptest_failed
 ifeq rjmp .cmptest_finish
 
 .cmptest_failed:
-add r1, #1
+mov r1, #1
 .cmptest_finish:
 mov r0, cmptest_str
 rcall(testresult)

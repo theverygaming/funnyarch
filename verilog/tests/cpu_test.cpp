@@ -26,7 +26,6 @@ int main(int argc, char **argv, char **env) {
 #endif
 
     cpu->clk = 1;
-    auto start = std::chrono::high_resolution_clock::now();
     vluint64_t t;
     std::ifstream inf("output.bin", std::ios::binary);
     std::ofstream outf("output.txt");
@@ -41,6 +40,7 @@ int main(int argc, char **argv, char **env) {
     }
     inf.close();
 
+    auto start = std::chrono::high_resolution_clock::now();
     // for (t = 0; t < ((4) * (2 * 4)) + (4); t++) {
     // for (t = 0; t < 100; t++) {
     for (t = 0; true; t++) {
@@ -66,6 +66,9 @@ int main(int argc, char **argv, char **env) {
                     printf("%c", mem[cpu->address]);
                     fprintf(stderr, "OUTPUT CHAR: %c\n", mem[cpu->address]);
                 }
+#ifdef GRAPHICS
+                sdl.mem_write(cpu->address, cpu->data);
+#endif
             } else {
                 if (cpu->address >= memsize - 4) {
                     break;
@@ -98,24 +101,26 @@ int main(int argc, char **argv, char **env) {
 #endif
 #ifdef GRAPHICS
         if (t % 400000 == 0) {
-            sdl.redraw(mem, memsize);
-            if (!sdl.update()) {
+            sdl.redraw();
+            if (!sdl.update_events()) {
                 break;
             }
         }
 #endif
     }
     auto end = std::chrono::high_resolution_clock::now();
-    double hz = (1 / (((double)std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() / t) / (1000000000)));
-    fprintf(stderr, "simulation ran at %fMHz", hz / 1000000);
+    double ns = (double)std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+    double hz = (1 / ((ns / (t / 2)) / (1000000000)));
+    fprintf(stderr, "simulation ran at %fMHz - %fns/clock cycle\n", hz / 1000000, ns / (t / 2));
     outf.close();
 #ifdef TRACE
     m_trace->close();
 #endif
     fprintf(stderr, "r10: 0x%x \n", cpu->rootp->cpu__DOT__ctrl__DOT__regarr[10]);
 #ifdef GRAPHICS
+    sdl.full_redraw(mem, memsize);
     while (true) {
-        if (!sdl.update()) {
+        if (!sdl.update_events()) {
             break;
         }
     }

@@ -5,6 +5,8 @@ module alu (
     output reg [31:0] out,
     output reg carry, zero
 );
+  wire signed [31:0] in1s = in1;
+  wire signed [31:0] in2s = in2;
   reg [32:0] tmp;
   always @(*) begin
     case (opcode)
@@ -12,7 +14,7 @@ module alu (
       4'h2: tmp = {1'b0, in1} - {1'b0, in2};  /* sub */
       4'h3: tmp = {1'b0, in1} << {1'b0, in2};  /* shl (logical) */
       4'h4: tmp = {1'b0, in1} >> {1'b0, in2};  /* shr (logical) */
-      4'h5: tmp = {1'b0, in1} >>> {1'b0, in2};  /* sar (arithmetic) */
+      4'h5: tmp = {1'b0, in1s >>> in2s};  /* sar (arithmetic) */
       4'h6: tmp = {1'b0, in1} & {1'b0, in2};  /* and */
       4'h7: tmp = {1'b0, in1} | {1'b0, in2};  /* or */
       4'h8: tmp = {1'b0, in1} ^ {1'b0, in2};  /* xor */

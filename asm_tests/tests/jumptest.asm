@@ -42,7 +42,7 @@ rjmp .jumptest_2
 
 
 .jumptest_failed:
-add r1, #1
+mov r1, #1
 .jumptest_finish:
 mov r0, jumptest_str
 rcall(testresult)
