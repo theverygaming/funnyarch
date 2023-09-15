@@ -15,6 +15,8 @@ rcall(testresult)
 rcall(alltests)
 //rcall(drawchar)
 pop(lr)
+loop:
+rjmp loop
 jmp #0xFFFF
 
 defstr(str_mainruns, "main runs")

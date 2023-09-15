@@ -1,14 +1,6 @@
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <string>
-#include <unistd.h>
-#include <utility>
-
 #include "cpu.h"
-#include "mem.h"
-#include "tools.h"
+#include <stdio.h>
+#include <string.h>
 
 // #define ISDEBUG
 
@@ -20,6 +12,12 @@
     } while (0)
 #endif
 
+#define INFO_PRINTF(...) fprintf(stderr, __VA_ARGS__)
+
+template <typename T> static inline void bitset(T *c, uint8_t bit, bool value) {
+    *c ^= (-value ^ *c) & (1ul << bit);
+}
+
 static inline long signexpand(unsigned long value, unsigned int bits) {
     if ((value >> (bits - 1)) != 0) {
         value |= ~((1ul << bits) - 1);
@@ -27,129 +25,123 @@ static inline long signexpand(unsigned long value, unsigned int bits) {
     return value;
 }
 
-cpu::cpu_except::cpu_except(etype e) {
-    _e = e;
-}
-
-const char *cpu::cpu_except::what() const noexcept {
-    switch (_e) {
-    case etype::PAGEFAULT:
-        return "CPU exception - page fault";
-    case etype::PROTECTIONFAULT:
-        return "CPU exception - protection fault";
-    case etype::INVALIDOPCODE:
-        return "CPU exception - invalid opcode";
-    case etype::DIVIDEBYZERO:
-        return "CPU exception - divide by zero";
-    }
-    return "unknown CPU exception";
-}
-
-struct cpu::cpu cpu::cpuctx;
-
-void cpu::init() {
-    cpuctx.mem_ram = new uint8_t[RAM_BYTES];
-    cpuctx.mem_rom = new uint8_t[ROM_BYTES];
-}
-
-void cpu::deinit() {
-    delete[] cpuctx.mem_ram;
-    delete[] cpuctx.mem_rom;
+void cpu::init(uint32_t (*_mem_read)(uint32_t addr), void (*_mem_write)(uint32_t addr, uint32_t data)) {
+    mem_read = _mem_read;
+    mem_write = _mem_write;
 }
 
 void cpu::reset() {
-    int fd = open("/dev/random", O_RDONLY);
-    read(fd, cpuctx.mem_ram, sizeof(RAM_BYTES));
-    close(fd);
-    memset(cpuctx.regs, 0, sizeof(cpuctx.regs));
-    cpuctx.regs[REG_IP] = ROM_BASE;
+    memset(regs, 0, sizeof(regs));
+    // regs[CPU_REG_IP] = ROM_BASE;
 }
 
-static bool shouldexecute(uint8_t condition) {
+bool cpu::shouldexecute(uint8_t condition) {
     switch (condition) {
     case 0: // always
         return true;
     case 1: // if equal
-        return (cpu::cpuctx.regs[REG_FLAGS] & 0b10) != 0;
+        return (regs[CPU_REG_FLAGS] & 0b10) != 0;
     case 2: // if not equal
-        return (cpu::cpuctx.regs[REG_FLAGS] & 0b10) == 0;
+        return (regs[CPU_REG_FLAGS] & 0b10) == 0;
     case 3: // if less than
-        return (cpu::cpuctx.regs[REG_FLAGS] & 0b01) != 0;
+        return (regs[CPU_REG_FLAGS] & 0b01) != 0;
     case 4: // if greater than or equal
-        return (cpu::cpuctx.regs[REG_FLAGS] & 0b01) == 0;
+        return (regs[CPU_REG_FLAGS] & 0b01) == 0;
     case 5: // if greater than
-        return (cpu::cpuctx.regs[REG_FLAGS] & 0b11) == 0;
+        return (regs[CPU_REG_FLAGS] & 0b11) == 0;
     case 6: // if less than or equal
-        return (cpu::cpuctx.regs[REG_FLAGS] & 0b11) != 0;
+        return (regs[CPU_REG_FLAGS] & 0b11) != 0;
     }
     return true;
 }
 
-struct __attribute__((packed)) enc_1 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned int src1 : 5;
-    unsigned int src2 : 5;
-    unsigned int tgt : 5;
-    unsigned int instr_spe : 8;
+union enc_1 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned int src1 : 5;
+        unsigned int src2 : 5;
+        unsigned int tgt : 5;
+        unsigned int instr_spe : 8;
+    } str;
 };
 
-struct __attribute__((packed)) enc_2 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned int src : 5;
-    unsigned int tgt : 5;
-    unsigned int imm13 : 13;
+union enc_2 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned int src : 5;
+        unsigned int tgt : 5;
+        unsigned long imm13 : 13;
+    } str;
 };
 
-struct __attribute__((packed)) enc_3 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned int tgt : 5;
-    unsigned int instr_spe : 2;
-    unsigned int imm16 : 16;
+union enc_3 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned int tgt : 5;
+        unsigned int instr_spe : 2;
+        unsigned long imm16 : 16;
+    } str;
 };
 
-struct __attribute__((packed)) enc_4 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned long imm23 : 23;
+union enc_4 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned long imm23 : 23;
+    } str;
 };
 
-struct __attribute__((packed)) enc_5 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned int tgt : 5;
-    unsigned long instr_spe : 18;
+union enc_5 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned int tgt : 5;
+        unsigned long instr_spe : 18;
+    } str;
 };
 
-struct __attribute__((packed)) enc_6 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned long instr_spe : 23;
+union enc_6 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned long instr_spe : 23;
+    } str;
 };
 
-struct __attribute__((packed)) enc_7 {
-    unsigned int opcode : 6;
-    unsigned int condition : 3;
-    unsigned int src : 5;
-    unsigned int tgt : 5;
-    unsigned int instr_spe : 13;
+union enc_7 {
+    uint32_t instr;
+    struct __attribute__((packed)) {
+        unsigned int opcode : 6;
+        unsigned int condition : 3;
+        unsigned int src : 5;
+        unsigned int tgt : 5;
+        unsigned int instr_spe : 13;
+    } str;
 };
 
-void cpu::execute() {
-    uint32_t instr = mem::read<uint32_t>(cpuctx.regs[REG_IP] & 0xFFFFFFFC);
-    cpuctx.regs[REG_IP] += 4;
+void cpu::execute(uint32_t instrs) {
+begin:
+    uint32_t instr = mem_read(regs[CPU_REG_IP] & 0xFFFFFFFC);
+    regs[CPU_REG_IP] += 4;
     uint8_t opcode = instr & 0x3F;
     uint8_t cond = (instr >> 6) & 0x07;
 
     if (!shouldexecute(cond)) {
         DEBUG_PRINTF("SKIPPING ");
-        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (cpuctx.regs[REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
-        return;
+        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        goto finish;
     }
 
-    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (cpuctx.regs[REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
 
     switch (opcode) {
     case 0x00: { /* NOP(E6) */
@@ -157,174 +149,202 @@ void cpu::execute() {
     }
 
     case 0x01: { /* STRPI(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] += signexpand(e.imm13, 13);
-        mem::write<uint32_t>(cpuctx.regs[e.tgt], cpuctx.regs[e.src]);
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] += signexpand(e.str.imm13, 13);
+        mem_write(regs[e.str.tgt], regs[e.str.src]);
         break;
     }
 
     case 0x02: { /* JMP(E4) */
-        struct enc_4 e = *((struct enc_4 *)&instr);
-        cpuctx.regs[REG_IP] = e.imm23 * 4;
+        union enc_4 e;
+        e.instr = instr;
+        regs[CPU_REG_IP] = e.str.imm23 * 4;
         break;
     }
 
     case 0x03: { /* RJMP(E4) */
-        struct enc_4 e = *((struct enc_4 *)&instr);
-        cpuctx.regs[REG_IP] += signexpand(e.imm23, 23) * 4;
+        union enc_4 e;
+        e.instr = instr;
+        regs[CPU_REG_IP] += signexpand(e.str.imm23, 23) * 4;
         break;
     }
 
     case 0x04: { /* MOV(E7) */
-        struct enc_7 e = *((struct enc_7 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src];
+        union enc_7 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src];
         break;
     }
 
     case 0x05: { /* MOV(E3) */
-        struct enc_3 e = *((struct enc_3 *)&instr);
-        if (e.instr_spe == 0b01) {
-            cpuctx.regs[e.tgt] = (cpuctx.regs[e.tgt] & 0xFFFF) | (e.imm16 << 16);
+        union enc_3 e;
+        e.instr = instr;
+        if (e.str.instr_spe == 0b01) {
+            regs[e.str.tgt] = (regs[e.str.tgt] & 0xFFFF) | (e.str.imm16 << 16);
         } else {
-            cpuctx.regs[e.tgt] = e.imm16;
+            regs[e.str.tgt] = e.str.imm16;
         }
         break;
     }
 
     case 0x07: { /* LDRI(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] = mem::read<uint32_t>(cpuctx.regs[e.src]);
-        cpuctx.regs[e.src] += signexpand(e.imm13, 13);
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] = mem_read(regs[e.str.src]);
+        regs[e.str.src] += signexpand(e.str.imm13, 13);
         break;
     }
 
     case 0x08: { /* STR(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        mem::write<uint32_t>(cpuctx.regs[e.tgt] + signexpand(e.imm13, 13), cpuctx.regs[e.src]);
+        union enc_2 e;
+        e.instr = instr;
+        mem_write(regs[e.str.tgt] + signexpand(e.str.imm13, 13), regs[e.str.src]);
         break;
     }
 
     case 0x0a: { /* JAL(E4) */
-        struct enc_4 e = *((struct enc_4 *)&instr);
-        cpuctx.regs[REG_LR] = cpuctx.regs[REG_IP];
-        cpuctx.regs[REG_IP] = e.imm23 * 4;
+        union enc_4 e;
+        e.instr = instr;
+        regs[CPU_REG_LR] = regs[CPU_REG_IP];
+        regs[CPU_REG_IP] = e.str.imm23 * 4;
         break;
     }
 
     case 0x0b: { /* RJAL(E4) */
-        struct enc_4 e = *((struct enc_4 *)&instr);
-        cpuctx.regs[REG_LR] = cpuctx.regs[REG_IP];
-        cpuctx.regs[REG_IP] += signexpand(e.imm23, 23) * 4;
+        union enc_4 e;
+        e.instr = instr;
+        regs[CPU_REG_LR] = regs[CPU_REG_IP];
+        regs[CPU_REG_IP] += signexpand(e.str.imm23, 23) * 4;
         break;
     }
 
     case 0x0c: { /* CMP(E7) */
-        struct enc_7 e = *((struct enc_7 *)&instr);
+        union enc_7 e;
+        e.instr = instr;
         uint32_t result;
-        bool carry = __builtin_sub_overflow(cpuctx.regs[e.tgt], cpuctx.regs[e.src], &result);
-        bitset(&cpuctx.regs[REG_FLAGS], 0, carry);
-        bitset(&cpuctx.regs[REG_FLAGS], 1, result == 0);
+        bool carry = __builtin_sub_overflow(regs[e.str.tgt], regs[e.str.src], &result);
+        bitset(&regs[CPU_REG_FLAGS], 0, carry);
+        bitset(&regs[CPU_REG_FLAGS], 1, result == 0);
         break;
     }
 
     case 0x0d: { /* CMP(E3) */
-        struct enc_3 e = *((struct enc_3 *)&instr);
+        union enc_3 e;
+        e.instr = instr;
         uint32_t result;
-        bool carry = __builtin_sub_overflow(cpuctx.regs[e.tgt], e.imm16, &result);
-        bitset(&cpuctx.regs[REG_FLAGS], 0, carry);
-        bitset(&cpuctx.regs[REG_FLAGS], 1, result == 0);
+        bool carry = __builtin_sub_overflow(regs[e.str.tgt], e.str.imm16, &result);
+        bitset(&regs[CPU_REG_FLAGS], 0, carry);
+        bitset(&regs[CPU_REG_FLAGS], 1, result == 0);
         break;
     }
 
     case 0x10: { /* ADD(E1) */
-        struct enc_1 e = *((struct enc_1 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src1] + cpuctx.regs[e.src2];
+        union enc_1 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src1] + regs[e.str.src2];
         break;
     }
 
     case 0x11: { /* ADD(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src] + e.imm13;
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src] + e.str.imm13;
         break;
     }
 
     case 0x12: { /* ADD(E3) */
-        struct enc_3 e = *((struct enc_3 *)&instr);
-        if (e.instr_spe == 0b01) {
-            cpuctx.regs[e.tgt] += e.imm16 << 16;
+        union enc_3 e;
+        e.instr = instr;
+        if (e.str.instr_spe == 0b01) {
+            regs[e.str.tgt] += e.str.imm16 << 16;
         } else {
-            cpuctx.regs[e.tgt] += e.imm16;
+            regs[e.str.tgt] += e.str.imm16;
         }
         break;
     }
 
     case 0x13: { /* SUB(E1) */
-        struct enc_1 e = *((struct enc_1 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src1] - cpuctx.regs[e.src2];
+        union enc_1 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src1] - regs[e.str.src2];
         break;
     }
 
     case 0x14: { /* SUB(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src] - e.imm13;
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src] - e.str.imm13;
         break;
     }
 
     case 0x15: { /* SUB(E3) */
-        struct enc_3 e = *((struct enc_3 *)&instr);
-        if (e.instr_spe == 0b01) {
-            cpuctx.regs[e.tgt] -= e.imm16 << 16;
+        union enc_3 e;
+        e.instr = instr;
+        if (e.str.instr_spe == 0b01) {
+            regs[e.str.tgt] -= e.str.imm16 << 16;
         } else {
-            cpuctx.regs[e.tgt] -= e.imm16;
+            regs[e.str.tgt] -= e.str.imm16;
         }
         break;
     }
 
     case 0x16: { /* SHL(E1) */
-        struct enc_1 e = *((struct enc_1 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src2] <= 31 ? (cpuctx.regs[e.src1] << cpuctx.regs[e.src2]) : 0;
+        union enc_1 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src2] <= 31 ? (regs[e.str.src1] << regs[e.str.src2]) : 0;
         break;
     }
 
     case 0x17: { /* SHL(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] = e.imm13 <= 31 ? (cpuctx.regs[e.src] << e.imm13) : 0;
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] = e.str.imm13 <= 31 ? (regs[e.str.src] << e.str.imm13) : 0;
         break;
     }
 
     case 0x18: { /* SHR(E1) */
-        struct enc_1 e = *((struct enc_1 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src2] <= 31 ? (cpuctx.regs[e.src1] >> cpuctx.regs[e.src2]) : 0;
+        union enc_1 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src2] <= 31 ? (regs[e.str.src1] >> regs[e.str.src2]) : 0;
         break;
     }
 
     case 0x19: { /* SHR(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] = e.imm13 <= 31 ? (cpuctx.regs[e.src] >> e.imm13) : 0;
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] = e.str.imm13 <= 31 ? (regs[e.str.src] >> e.str.imm13) : 0;
         break;
     }
 
     case 0x1A: { /* SAR(E1) */
-        struct enc_1 e = *((struct enc_1 *)&instr);
-        cpuctx.regs[e.tgt] = cpuctx.regs[e.src2] <= 31 ? ((int32_t)cpuctx.regs[e.src1] >> cpuctx.regs[e.src2]) : 0;
+        union enc_1 e;
+        e.instr = instr;
+        regs[e.str.tgt] = regs[e.str.src2] <= 31 ? ((int32_t)regs[e.str.src1] >> regs[e.str.src2]) : 0;
         break;
     }
 
     case 0x1B: { /* SAR(E2) */
-        struct enc_2 e = *((struct enc_2 *)&instr);
-        cpuctx.regs[e.tgt] = e.imm13 <= 31 ? ((int32_t)cpuctx.regs[e.src] >> e.imm13) : 0;
+        union enc_2 e;
+        e.instr = instr;
+        regs[e.str.tgt] = e.str.imm13 <= 31 ? ((int32_t)regs[e.str.src] >> e.str.imm13) : 0;
         break;
     }
 
     default:
-        fprintf(stderr, "ip: 0x%x istr: 0x%x opc: 0x%x\n", (cpuctx.regs[REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
-        throw cpu_except(cpu_except::etype::INVALIDOPCODE);
+        INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        // throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 
-    /*for (int i = 0; i < 32; i++) {
-        printf("%s: 0x%lx | ", cpudesc::regnames[i], cpuctx.regs[i]);
+/*for (int i = 0; i < 32; i++) {
+    printf("%s: 0x%lx | ", cpudesc::regnames[i], regs[i]);
+}
+printf("\n");*/
+finish:
+    instrs -= 1;
+    if (instrs != 0) {
+        goto begin;
     }
-    printf("\n");*/
 }
 
 const char *cpudesc::regnames[32] = {

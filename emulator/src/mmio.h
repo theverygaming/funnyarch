@@ -14,8 +14,8 @@ namespace mmio {
     }
 
     inline void write(uint64_t addr, uint8_t val) {
-        if (addr == 0) {
-            fprintf(stderr, "%c", (char)val);
+        if (addr == 0x1000) {
+            fprintf(stderr, "%c", (char)(val & 0xFF));
         }
         if (addr >= 1 && (addr - 1) < fb::buf_size) {
             ((uint8_t *)fb::buf)[addr - 1] = val;
