@@ -20,7 +20,12 @@
     } while (0)
 #endif
 
-#define ARRLEN(x) (sizeof(x) / sizeof(x[0]))
+static inline long signexpand(unsigned long value, unsigned int bits) {
+    if ((value >> (bits - 1)) != 0) {
+        value |= ~((1ul << bits) - 1);
+    }
+    return value;
+}
 
 cpu::cpu_except::cpu_except(etype e) {
     _e = e;
@@ -57,445 +62,272 @@ void cpu::reset() {
     read(fd, cpuctx.mem_ram, sizeof(RAM_BYTES));
     close(fd);
     memset(cpuctx.regs, 0, sizeof(cpuctx.regs));
-    cpuctx.regs[REG_IP] = RAM_BASE + 0x1000;
-    cpuctx.regs[REG_SFLAGS] = (1 << 1); // supervisor mode
+    cpuctx.regs[REG_IP] = ROM_BASE;
 }
-
-enum {
-    OPC_NOP = 0x01,
-    OPC_MOV = 0x02,
-    OPC_ADD = 0x03,
-    OPC_SUB = 0x04,
-    OPC_DIV = 0x05,
-    OPC_IDIV = 0x06,
-    OPC_MUL = 0x07,
-    OPC_IMUL = 0x08,
-    OPC_REM = 0x09,
-    OPC_IREM = 0x0A,
-    OPC_SHR = 0x0B,
-    OPC_SHL = 0x0C,
-    OPC_SAR = 0x0D,
-    OPC_AND = 0x0E,
-    OPC_OR = 0x0F,
-    OPC_XOR = 0x10,
-    OPC_NOT = 0x11,
-    OPC_TEST = 0x12,
-    OPC_JMP = 0x13,
-    OPC_RJMP = 0x14,
-    OPC_CMP = 0x15,
-    OPC_INT = 0x16,
-    OPC_IRET = 0x17,
-    OPC_WFI = 0x18,
-    OPC_INVLPG = 0x19,
-};
-
-static const struct {
-    const char *name;
-    const unsigned int op_count;
-} asm_opc_info[]{
-    [0] = {"", 0},
-    [OPC_NOP] = {"nop", 0},
-    [OPC_MOV] = {"mov", 2},
-    [OPC_ADD] = {"add", 2},
-    [OPC_SUB] = {"sub", 2},
-    [OPC_DIV] = {"div", 2},
-    [OPC_IDIV] = {"idiv", 2},
-    [OPC_MUL] = {"mul", 2},
-    [OPC_IMUL] = {"imul", 2},
-    [OPC_REM] = {"rem", 2},
-    [OPC_IREM] = {"irem", 2},
-    [OPC_SHR] = {"shr", 2},
-    [OPC_SHL] = {"shl", 2},
-    [OPC_SAR] = {"sar", 2},
-    [OPC_AND] = {"and", 2},
-    [OPC_OR] = {"or", 2},
-    [OPC_XOR] = {"xor", 2},
-    [OPC_NOT] = {"not", 2},
-    [OPC_TEST] = {"test", 2},
-    [OPC_JMP] = {"jmp", 1},
-    [OPC_RJMP] = {"rjmp", 1},
-    [OPC_CMP] = {"cmp", 2},
-    [OPC_INT] = {"int", 1},
-    [OPC_IRET] = {"iret", 0},
-    [OPC_WFI] = {"wfi", 0},
-    [OPC_INVLPG] = {"invlpg", 1},
-};
-
-static const unsigned int asm_op_sizes[]{
-    [0] = 1,
-    [1] = 2,
-    [2] = 4,
-    [3] = 8,
-};
 
 static bool shouldexecute(uint8_t condition) {
     switch (condition) {
     case 0: // always
         return true;
-    case 1: // ifz
+    case 1: // if equal
         return (cpu::cpuctx.regs[REG_FLAGS] & 0b10) != 0;
-    case 2: // ifnz
+    case 2: // if not equal
         return (cpu::cpuctx.regs[REG_FLAGS] & 0b10) == 0;
-    case 3: // ifc
+    case 3: // if less than
         return (cpu::cpuctx.regs[REG_FLAGS] & 0b01) != 0;
-    case 4: // ifnc
+    case 4: // if greater than or equal
         return (cpu::cpuctx.regs[REG_FLAGS] & 0b01) == 0;
-    case 5: // ifnzc
+    case 5: // if greater than
         return (cpu::cpuctx.regs[REG_FLAGS] & 0b11) == 0;
-    case 6: // ifzoc
+    case 6: // if less than or equal
         return (cpu::cpuctx.regs[REG_FLAGS] & 0b11) != 0;
     }
     return true;
 }
 
-static void next_operand(uint64_t *ip, uint8_t opsize, uint8_t optype) {
-    switch (optype) {
-    case 0:
-    case 1:
-        (*ip)++;
-        break;
-    case 2:
-        *ip += asm_op_sizes[opsize];
-        break;
-    case 3:
-        *ip += 8;
-        break;
-    }
-}
+struct __attribute__((packed)) enc_1 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned int src1 : 5;
+    unsigned int src2 : 5;
+    unsigned int tgt : 5;
+    unsigned int instr_spe : 8;
+};
 
-static uint64_t get_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, bool derefreg = false, bool derefptr = false) {
-    uint64_t val;
+struct __attribute__((packed)) enc_2 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned int src : 5;
+    unsigned int tgt : 5;
+    unsigned int imm13 : 13;
+};
 
-    if (optype <= 1) { // register
-        val = mem::read<uint8_t>(*ip);
-    } else if (optype == 3) { // immediate pointer
-        val = mem::read<uint64_t>(*ip);
-    } else { // immediate
-        switch (opsize) {
-        case 0:
-            val = mem::read<uint8_t>(*ip);
-            break;
-        case 1:
-            val = mem::read<uint16_t>(*ip);
-            break;
-        case 2:
-            val = mem::read<uint32_t>(*ip);
-            break;
-        case 3:
-            val = mem::read<uint64_t>(*ip);
-            break;
-        }
-    }
+struct __attribute__((packed)) enc_3 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned int tgt : 5;
+    unsigned int instr_spe : 2;
+    unsigned int imm16 : 16;
+};
 
-    if (optype <= 1 && derefreg) { // register
-        if (val >= ARRLEN(cpu::cpuctx.regs)) {
-            throw cpu::cpu_except(cpu::cpu_except::etype::INVALIDOPCODE);
-        }
-        val = cpu::cpuctx.regs[val];
-    }
+struct __attribute__((packed)) enc_4 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned long imm23 : 23;
+};
 
-    if ((optype == 3 || optype == 1) && derefptr) { // pointer
-        switch (opsize) {
-        case 0:
-            val = mem::read<uint8_t>(val);
-            break;
-        case 1:
-            val = mem::read<uint16_t>(val);
-            break;
-        case 2:
-            val = mem::read<uint32_t>(val);
-            break;
-        case 3:
-            val = mem::read<uint64_t>(val);
-            break;
-        }
-    }
+struct __attribute__((packed)) enc_5 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned int tgt : 5;
+    unsigned long instr_spe : 18;
+};
 
-    uint64_t sizemask = (1ULL << (asm_op_sizes[opsize] * 8)) - 1;
-    if ((asm_op_sizes[opsize] * 8) == 64) {
-        sizemask = UINT64_MAX;
-    }
+struct __attribute__((packed)) enc_6 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned long instr_spe : 23;
+};
 
-    val &= sizemask;
-
-    return val;
-}
-
-static void set_operand_val(uint64_t *ip, uint8_t opsize, uint8_t optype, uint64_t setval) {
-    uint64_t val;
-
-    if (optype <= 1) { // register
-        val = mem::read<uint8_t>(*ip);
-    } else if (optype == 3) { // immediate pointer
-        val = mem::read<uint64_t>(*ip);
-    } else { // immediate
-        DEBUG_PRINTF("can't write to immediate\n");
-        throw cpu::cpu_except(cpu::cpu_except::etype::INVALIDOPCODE);
-    }
-
-    if (optype <= 1) {
-        if (val >= ARRLEN(cpu::cpuctx.regs)) {
-            DEBUG_PRINTF("invalid register\n");
-            throw cpu::cpu_except(cpu::cpu_except::etype::INVALIDOPCODE);
-        }
-    }
-
-    if (optype == 1) { // register pointer
-        val = cpu::cpuctx.regs[val];
-    }
-
-    uint64_t sizemask = (1ULL << (asm_op_sizes[opsize] * 8)) - 1;
-    if ((asm_op_sizes[opsize] * 8) == 64) {
-        sizemask = UINT64_MAX;
-    }
-
-    if (optype == 0) { // register
-        cpu::cpuctx.regs[val] = (cpu::cpuctx.regs[val] & ~sizemask) | (setval & sizemask);
-    }
-
-    if ((optype == 3 || optype == 1)) { // pointer
-        switch (opsize) {
-        case 0:
-            mem::write<uint8_t>(val, setval & sizemask);
-            break;
-        case 1:
-            mem::write<uint16_t>(val, setval & sizemask);
-            break;
-        case 2:
-            mem::write<uint32_t>(val, setval & sizemask);
-            break;
-        case 3:
-            mem::write<uint64_t>(val, setval & sizemask);
-            break;
-        }
-    }
-}
-
-#define OPSIZE8  (0)
-#define OPSIZE16 (1)
-#define OPSIZE32 (2)
-#define OPSIZE64 (3)
-
-#define OPC(size, operation) ((uint16_t)operation | (size << 7))
-
-/* clang-format off */
-#define OPC_ALLSIZES(operation)    \
-    OPC(OPSIZE8, operation):       \
-    case OPC(OPSIZE16, operation): \
-    case OPC(OPSIZE32, operation): \
-    case OPC(OPSIZE64, operation)
-/* clang-format on */
+struct __attribute__((packed)) enc_7 {
+    unsigned int opcode : 6;
+    unsigned int condition : 3;
+    unsigned int src : 5;
+    unsigned int tgt : 5;
+    unsigned int instr_spe : 13;
+};
 
 void cpu::execute() {
-    const uint64_t ip_current = cpuctx.regs[REG_IP];
-    uint64_t ip_mut = ip_current;
+    uint32_t instr = mem::read<uint32_t>(cpuctx.regs[REG_IP] & 0xFFFFFFFC);
+    cpuctx.regs[REG_IP] += 4;
+    uint8_t opcode = instr & 0x3F;
+    uint8_t cond = (instr >> 6) & 0x07;
 
-    uint16_t control = mem::read<uint16_t>(cpuctx.regs[REG_IP]);
-    uint8_t opcode = control & ((1UL << 7) - 1);
-    uint8_t op_size = (control >> 7) & 0b11;
-    uint8_t source_type = (control >> 9) & 0b11;
-    uint8_t target_type = (control >> 11) & 0b11;
-    uint8_t condition = (control >> 13) & 0b111;
-
-    ip_mut += 2; // control
-
-    if ((opcode > OPC_INVLPG || opcode < 0x01) || (condition > 6)) { // invalid opcode
-        DEBUG_PRINTF("unknown opcode\n");
-        throw cpu_except(cpu_except::etype::INVALIDOPCODE);
+    if (!shouldexecute(cond)) {
+        DEBUG_PRINTF("SKIPPING ");
+        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (cpuctx.regs[REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        return;
     }
 
-    if (asm_opc_info[opcode].op_count == 2 && target_type == 2) { // cannot have immediate as target
-        throw cpu_except(cpu_except::etype::INVALIDOPCODE);
+    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (cpuctx.regs[REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+
+    switch (opcode) {
+    case 0x00: { /* NOP(E6) */
+        break;
     }
 
-    DEBUG_PRINTF("instr: %s\n", asm_opc_info[opcode].name);
-    DEBUG_PRINTF("    -> opc: 0x%x op_size: 0x%x source_type: 0x%x target_type: 0x%x condition: 0x%x\n", (unsigned int)opcode, (unsigned int)op_size, (unsigned int)source_type, (unsigned int)target_type, (unsigned int)condition);
+    case 0x01: { /* STRPI(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] += signexpand(e.imm13, 13);
+        mem::write<uint32_t>(cpuctx.regs[e.tgt], cpuctx.regs[e.src]);
+        break;
+    }
 
-    uint64_t ip_next = ip_mut;
+    case 0x02: { /* JMP(E4) */
+        struct enc_4 e = *((struct enc_4 *)&instr);
+        cpuctx.regs[REG_IP] = e.imm23 * 4;
+        break;
+    }
 
-    if (asm_opc_info[opcode].op_count != 0) {
-        next_operand(&ip_next, op_size, source_type);
+    case 0x03: { /* RJMP(E4) */
+        struct enc_4 e = *((struct enc_4 *)&instr);
+        cpuctx.regs[REG_IP] += signexpand(e.imm23, 23) * 4;
+        break;
+    }
 
-        if (asm_opc_info[opcode].op_count == 2) {
-            next_operand(&ip_next, op_size, target_type);
+    case 0x04: { /* MOV(E7) */
+        struct enc_7 e = *((struct enc_7 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src];
+        break;
+    }
+
+    case 0x05: { /* MOV(E3) */
+        struct enc_3 e = *((struct enc_3 *)&instr);
+        if (e.instr_spe == 0b01) {
+            cpuctx.regs[e.tgt] = (cpuctx.regs[e.tgt] & 0xFFFF) | (e.imm16 << 16);
+        } else {
+            cpuctx.regs[e.tgt] = e.imm16;
         }
-    }
-
-    uint64_t sourceval = 0;
-    if (asm_opc_info[opcode].op_count != 0) {
-        sourceval = get_operand_val(&ip_mut, op_size, source_type, true, true);
-        next_operand(&ip_mut, op_size, source_type);
-        DEBUG_PRINTF("    -> source value: 0x%llx\n", sourceval);
-    }
-
-    if (!shouldexecute(condition)) {
-        cpuctx.regs[REG_IP] = ip_next;
-        return;
-    }
-
-    switch (control & 0b111111111) {
-    case OPC_ALLSIZES(OPC_NOP): {
         break;
     }
 
-    case OPC_ALLSIZES(OPC_MOV): {
-        set_operand_val(&ip_mut, op_size, target_type, sourceval);
+    case 0x07: { /* LDRI(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] = mem::read<uint32_t>(cpuctx.regs[e.src]);
+        cpuctx.regs[e.src] += signexpand(e.imm13, 13);
         break;
     }
 
-    case OPC_ALLSIZES(OPC_ADD): {
-        // TODO: incomplete
-        uint64_t result;
-        uint64_t val2 = get_operand_val(&ip_mut, op_size, target_type, true, true);
-        __builtin_add_overflow(val2, sourceval, &result);
-        set_operand_val(&ip_mut, op_size, target_type, result);
+    case 0x08: { /* STR(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        mem::write<uint32_t>(cpuctx.regs[e.tgt] + signexpand(e.imm13, 13), cpuctx.regs[e.src]);
         break;
     }
 
-    case OPC_ALLSIZES(OPC_SUB): {
-        // TODO: incomplete
-        uint64_t result;
-        uint64_t val2 = get_operand_val(&ip_mut, op_size, target_type, true, true);
-        __builtin_sub_overflow(val2, sourceval, &result); // dest - src
-        set_operand_val(&ip_mut, op_size, target_type, result);
+    case 0x0a: { /* JAL(E4) */
+        struct enc_4 e = *((struct enc_4 *)&instr);
+        cpuctx.regs[REG_LR] = cpuctx.regs[REG_IP];
+        cpuctx.regs[REG_IP] = e.imm23 * 4;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_DIV): {
+    case 0x0b: { /* RJAL(E4) */
+        struct enc_4 e = *((struct enc_4 *)&instr);
+        cpuctx.regs[REG_LR] = cpuctx.regs[REG_IP];
+        cpuctx.regs[REG_IP] += signexpand(e.imm23, 23) * 4;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_IDIV): {
+    case 0x0c: { /* CMP(E7) */
+        struct enc_7 e = *((struct enc_7 *)&instr);
+        uint32_t result;
+        bool carry = __builtin_sub_overflow(cpuctx.regs[e.tgt], cpuctx.regs[e.src], &result);
+        bitset(&cpuctx.regs[REG_FLAGS], 0, carry);
+        bitset(&cpuctx.regs[REG_FLAGS], 1, result == 0);
         break;
     }
 
-    case OPC_ALLSIZES(OPC_MUL): {
+    case 0x0d: { /* CMP(E3) */
+        struct enc_3 e = *((struct enc_3 *)&instr);
+        uint32_t result;
+        bool carry = __builtin_sub_overflow(cpuctx.regs[e.tgt], e.imm16, &result);
+        bitset(&cpuctx.regs[REG_FLAGS], 0, carry);
+        bitset(&cpuctx.regs[REG_FLAGS], 1, result == 0);
         break;
     }
 
-    case OPC_ALLSIZES(OPC_IMUL): {
+    case 0x10: { /* ADD(E1) */
+        struct enc_1 e = *((struct enc_1 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src1] + cpuctx.regs[e.src2];
         break;
     }
 
-    case OPC_ALLSIZES(OPC_REM): {
+    case 0x11: { /* ADD(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src] + e.imm13;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_IREM): {
+    case 0x12: { /* ADD(E3) */
+        struct enc_3 e = *((struct enc_3 *)&instr);
+        if (e.instr_spe == 0b01) {
+            cpuctx.regs[e.tgt] += e.imm16 << 16;
+        } else {
+            cpuctx.regs[e.tgt] += e.imm16;
+        }
         break;
     }
 
-    case OPC_ALLSIZES(OPC_SHR): {
+    case 0x13: { /* SUB(E1) */
+        struct enc_1 e = *((struct enc_1 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src1] - cpuctx.regs[e.src2];
         break;
     }
 
-    case OPC_ALLSIZES(OPC_SHL): {
+    case 0x14: { /* SUB(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src] - e.imm13;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_SAR): {
+    case 0x15: { /* SUB(E3) */
+        struct enc_3 e = *((struct enc_3 *)&instr);
+        if (e.instr_spe == 0b01) {
+            cpuctx.regs[e.tgt] -= e.imm16 << 16;
+        } else {
+            cpuctx.regs[e.tgt] -= e.imm16;
+        }
         break;
     }
 
-    case OPC_ALLSIZES(OPC_AND): {
+    case 0x16: { /* SHL(E1) */
+        struct enc_1 e = *((struct enc_1 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src2] <= 31 ? (cpuctx.regs[e.src1] << cpuctx.regs[e.src2]) : 0;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_OR): {
+    case 0x17: { /* SHL(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] = e.imm13 <= 31 ? (cpuctx.regs[e.src] << e.imm13) : 0;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_XOR): {
+    case 0x18: { /* SHR(E1) */
+        struct enc_1 e = *((struct enc_1 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src2] <= 31 ? (cpuctx.regs[e.src1] >> cpuctx.regs[e.src2]) : 0;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_NOT): {
+    case 0x19: { /* SHR(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] = e.imm13 <= 31 ? (cpuctx.regs[e.src] >> e.imm13) : 0;
         break;
     }
 
-    case OPC_ALLSIZES(OPC_TEST): {
+    case 0x1A: { /* SAR(E1) */
+        struct enc_1 e = *((struct enc_1 *)&instr);
+        cpuctx.regs[e.tgt] = cpuctx.regs[e.src2] <= 31 ? ((int32_t)cpuctx.regs[e.src1] >> cpuctx.regs[e.src2]) : 0;
         break;
     }
 
-    case OPC(OPSIZE64, OPC_JMP): {
-        cpuctx.regs[REG_IP] = sourceval;
-        return;
-    }
-
-    case OPC(OPSIZE64, OPC_RJMP): {
-        cpuctx.regs[REG_IP] = ip_current + (int64_t)sourceval;
-        return;
-    }
-
-    case OPC_ALLSIZES(OPC_CMP): {
-        // TODO: incomplete
-        uint64_t tgt = get_operand_val(&ip_mut, op_size, target_type, true, true);
-        bitset(&cpuctx.regs[REG_FLAGS], 1, tgt == 0);
-        break;
-    }
-
-    case OPC(OPSIZE8, OPC_INT): {
-        break;
-    }
-
-    case OPC_ALLSIZES(OPC_IRET): {
-        break;
-    }
-
-    case OPC_ALLSIZES(OPC_WFI): {
-        break;
-    }
-
-    case OPC(OPSIZE64, OPC_INVLPG): {
+    case 0x1B: { /* SAR(E2) */
+        struct enc_2 e = *((struct enc_2 *)&instr);
+        cpuctx.regs[e.tgt] = e.imm13 <= 31 ? ((int32_t)cpuctx.regs[e.src] >> e.imm13) : 0;
         break;
     }
 
     default:
-        DEBUG_PRINTF("unknown opcode size\n");
+        fprintf(stderr, "ip: 0x%x istr: 0x%x opc: 0x%x\n", (cpuctx.regs[REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
         throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 
-    cpuctx.regs[REG_IP] = ip_next;
+    /*for (int i = 0; i < 32; i++) {
+        printf("%s: 0x%lx | ", cpudesc::regnames[i], cpuctx.regs[i]);
+    }
+    printf("\n");*/
 }
 
-const char *cpudesc::regnames[39] = {
-    "r0",
-    "r1",
-    "r2",
-    "r3",
-    "r4",
-    "r5",
-    "r6",
-    "r7",
-    "r8",
-    "r9",
-    "r10",
-    "r11",
-    "r12",
-    "r13",
-    "r14",
-    "r15",
-    "r16",
-    "r17",
-    "r18",
-    "r19",
-    "r20",
-    "r21",
-    "r22",
-    "r23",
-    "r24",
-    "r25",
-    "r26",
-    "r27",
-    "r28",
-    "r29",
-    "r30",
-    "r31",
-    "rip",
-    "rsp",
-    "rflags",
-    "risp",
-    "rsflags",
-    "rivt",
-    "rpd",
+const char *cpudesc::regnames[32] = {
+    "r0",  "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7",  "r8",  "r9",  "r10", "r11", "r12", "r13", "r14", "r15",
+    "r16", "r17", "r18", "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27", "lr",  "rsp", "rip", "rf",
 };

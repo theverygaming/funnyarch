@@ -9,11 +9,12 @@ module control (
     output reg [31:0] address,
 
     // ALU
-    output [ 3:0] alu_opcode,
+    output [3:0] alu_opcode,
     output [31:0] alu_op1,
     output [31:0] alu_op2,
-    input  [31:0] alu_out,
-    input alu_carry, alu_zero
+    input [31:0] alu_out,
+    input alu_carry,
+    alu_zero
 
     // definitions
     `define STATE_FETCH 3'h0
@@ -43,14 +44,14 @@ module control (
     end  // decode
     else if (state == `STATE_DECODE) begin
       instr = data_in;
-      if ((instr[8:6] == 0) || // always
-          (instr[8:6] == 1 && regarr[31][1] == 1) ||   // if equal
-          (instr[8:6] == 2 && regarr[31][1] == 0) ||   // if not equal
-          (instr[8:6] == 3 && regarr[31][0] == 1) ||   // if less than
-          (instr[8:6] == 4 && regarr[31][0] == 0) ||   // if greater than or equal
-          (instr[8:6] == 5 && regarr[31][1:0] == 0) || // if greater than
-          (instr[8:6] == 6 && regarr[31][1:0] != 0)    // if less than or equal
-        ) begin
+      if ((instr[8:6] == 0) ||  // always
+          (instr[8:6] == 1 && regarr[31][1] == 1) ||  // if equal
+          (instr[8:6] == 2 && regarr[31][1] == 0) ||  // if not equal
+          (instr[8:6] == 3 && regarr[31][0] == 1) ||  // if less than
+          (instr[8:6] == 4 && regarr[31][0] == 0) ||  // if greater than or equal
+          (instr[8:6] == 5 && regarr[31][1:0] == 0) ||  // if greater than
+          (instr[8:6] == 6 && regarr[31][1:0] != 0)  // if less than or equal
+          ) begin
         //$display("CPU: decoding opcode 0x%h", instr[5:0]);
         case (instr[5:0])
           6'h00: begin  /* NOP */

@@ -490,7 +490,9 @@ for line in infilec.splitlines():
     if len(line) == 0:
         continue
     try:
+        pos = outfile.tell()
         assembleinstr(line)
+        print(f"<0x{pos:x}> {line}")
     except Exception as e:
         print(f'error: {e}\nline: "{line}"')
         exit(1)

@@ -3,7 +3,8 @@ module alu (
     input [31:0] in1,
     in2,
     output reg [31:0] out,
-    output reg carry, zero
+    output reg carry,
+    zero
 );
   wire signed [31:0] in1s = in1;
   wire signed [31:0] in2s = in2;
@@ -21,8 +22,8 @@ module alu (
       4'h9: tmp = ~{1'b0, in1};  /* not */
       default: tmp = 0;
     endcase
-    out = tmp[31:0];
+    out   = tmp[31:0];
     carry = tmp[32];
-    zero = tmp[31:0] == 0;
+    zero  = tmp[31:0] == 0;
   end
 endmodule

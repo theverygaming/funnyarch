@@ -30,10 +30,9 @@ namespace mem {
         }
     }
 
-    template <typename T>
-    inline T read(uint64_t addr) {
+    template <typename T> inline T read(uint64_t addr) {
         uint64_t val_u64 = 0;
-        if ((cpu::cpuctx.regs[REG_SFLAGS] & (1 << 2)) == 0) { // no MMU
+        if (true) { // no MMU
             for (int i = 0; i < sizeof(T); i++) {
                 val_u64 |= (uint64_t)read_byte(addr + i) << (i * 8);
             }
@@ -41,10 +40,12 @@ namespace mem {
         return (T)val_u64;
     }
 
-    template <typename T>
-    inline void write(uint64_t addr, T val) {
+    template <typename T> inline void write(uint64_t addr, T val) {
+        if (addr == 0x1000) {
+            fprintf(stderr, "%c", (char)(val & 0xFF));
+        }
         uint64_t val_u64 = (uint64_t)val;
-        if ((cpu::cpuctx.regs[REG_SFLAGS] & (1 << 2)) == 0) { // no MMU
+        if (true) { // no MMU
             for (int i = 0; i < sizeof(T); i++) {
                 write_byte(addr + i, (val_u64 >> (i * 8)) & 0xFF);
             }

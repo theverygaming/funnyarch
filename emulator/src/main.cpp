@@ -7,23 +7,20 @@
 #include "sdl.h"
 
 int main(int, char *[]) {
-    std::ifstream inf("out.bin", std::ios::binary);
     cpu::init();
-
-    std::ifstream input("out.bin", std::ios::binary);
-
-    input.seekg(0, input.end);
-    size_t fsize = input.tellg();
-    input.seekg(0, input.beg);
-
-    input.read((char *)&cpu::cpuctx.mem_ram[0x1000], fsize);
-
-    input.close();
 
     sdl::init();
     fb::init();
 
     cpu::reset();
+
+    std::ifstream input("output.bin", std::ios::binary);
+    if (!input.good()) {
+        fprintf(stderr, "failed to read output.bin\n");
+        return 1;
+    }
+    input.read((char *)&cpu::cpuctx.mem_rom[0], ROM_BYTES);
+    input.close();
 
     while (true) {
         sdl::loop();
@@ -32,6 +29,7 @@ int main(int, char *[]) {
         auto t1 = std::chrono::high_resolution_clock::now();
         for (int i = 0; i < 200; i++) {
             for (int i = 0; i < 1000000; i++) {
+                // for (int i = 0; i < 100000; i++) {
                 cpu::execute();
                 instrs_executed++;
             }
@@ -56,7 +54,7 @@ int main(int, char *[]) {
     double mips = (1.0f / (exectime.count() / instrs_executed)) / 1000000;
     printf("%0.2f MIPS\n", mips);*/
 
-    for (int i = 0; i < 39; i++) {
+    for (int i = 0; i < 32; i++) {
         printf("%s: 0x%lx\n", cpudesc::regnames[i], cpu::cpuctx.regs[i]);
     }
 
