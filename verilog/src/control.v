@@ -20,6 +20,8 @@ module control (
     `define STATE_FETCH 3'h0
     `define STATE_DECODE 3'h1
     `define STATE_WRITEBACK 3'h2
+    `define STATE_INT_S1 3'h3
+    `define STATE_INT_S2 3'h4
 );
   reg [31:0] instr;
   reg [ 2:0] state;
@@ -136,6 +138,10 @@ module control (
             alu_op2 <= {16'b0, instr[31:16]};
             alu_opcode <= 4'h2;
             state <= `STATE_WRITEBACK;
+          end
+          6'h0e: begin  /* INT(E4) */
+            regarr[31][31:24] <= instr[16:9];
+            state <= `STATE_INT_S1;
           end
           6'h10: begin  /* ADD(E1) */
             alu_op1 <= regarr[instr[13:9]];
@@ -292,15 +298,23 @@ module control (
           state <= `STATE_FETCH;
         end
       endcase
-    end  // writeback
-    /*else if (state == 3) begin
-      //$display("CPU: writeback");
-      //write_data0 <= alu_out;
-      state <= 0;
-    end  // store
-    else if (state == 4) begin
-      //$display("CPU: store");
-      state <= 0;
-    end*/
+    end  // interrupt stage 1
+    else if (state == `STATE_INT_S1) begin
+      //$display("CPU: interrupt stage 1");
+      regarr[30] <= {regarr[27][31:2], 2'b0};
+      regarr[29] <= regarr[29] - 4;
+      address = regarr[29] - 4;
+      data_rw <= 1;
+      data_out <= regarr[30];
+      state <= `STATE_INT_S2;
+    end // interrupt stage 2
+    else if (state == `STATE_INT_S2) begin
+      //$display("CPU: interrupt stage 2");
+      regarr[29] <= regarr[29] - 4;
+      address = regarr[29] - 4;
+      data_rw <= 1;
+      data_out <= regarr[31];
+      state <= `STATE_FETCH;
+    end
   end
 endmodule

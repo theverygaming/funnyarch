@@ -6,9 +6,12 @@ rjmp main
 #include "tests.asm"
 #include "tests/all.asm"
 #include "memsize.asm"
+#include "interrupt.asm"
 
 main:
 mov rsp, #0x23E0
+mov iptr, int_handler
+int #0
 push(lr)
 mov r0, str_mainruns
 mov r1, #0

@@ -108,6 +108,9 @@ instructions = {
         Instruction(InstructionType.E7, 0x0C),
         Instruction(InstructionType.E3, 0x0D),
     ],
+    "int": [
+        Instruction(InstructionType.E4, 0x0E),
+    ],
     "add": [
         Instruction(InstructionType.E1, 0x10),
         Instruction(InstructionType.E2, 0x11),
@@ -177,7 +180,7 @@ regmap = {
     "r24": 24,
     "r25": 25,
     "r26": 26,
-    "r27": 27,
+    "iptr": 27,
     "lr": 28,
     "rsp": 29,
     "rip": 30,
