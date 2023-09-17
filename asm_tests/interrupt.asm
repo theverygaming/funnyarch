@@ -10,6 +10,5 @@ pop(r0)
 pop(lr)
 pop(rf)
 pop(rip)
-rjmp int_handler
 
 defstr(str_gotint, "hello from interrupt handler!")
