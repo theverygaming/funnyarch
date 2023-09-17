@@ -37,9 +37,10 @@ int main(int, char *[]) {
         sdl::loop();
 
         uint64_t instrs_executed = 0;
+        uint64_t clock_cycles = 0;
         auto t1 = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < 200; i++) {
-            cpu.execute(1000000);
+        for (int i = 0; i < 10; i++) {
+            clock_cycles += cpu.execute(1000000);
             instrs_executed += 1000000;
             fb::redraw();
             sdl::loop();
@@ -47,7 +48,10 @@ int main(int, char *[]) {
         auto t2 = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> exectime = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
         double mips = (1.0f / (exectime.count() / instrs_executed)) / 1000000;
-        printf("%0.2f MIPS %fs runtime\n", mips, exectime);
+        double freq = (1.0f / (exectime.count() / clock_cycles)) / 1000000;
+        double usage =
+            ((((double)clock_cycles) - ((double)instrs_executed * 2)) / (((double)instrs_executed * 3) - ((double)instrs_executed * 2))) * 100;
+        printf("Average CPU usage: %0.2f%% - %0.2f MIPS - %0.2fMHz - %fs runtime\n", usage, mips, freq, exectime);
         break;
     }
 

@@ -4,7 +4,7 @@
 #include "cpu.h"
 #include "mmio.h"
 
-#define RAM_BYTES (128 * 1000000)
+#define RAM_BYTES (4096)
 #define ROM_BYTES (1 * 8192)
 #define ROM_BASE  (0)
 #define RAM_BASE  (0x2000)

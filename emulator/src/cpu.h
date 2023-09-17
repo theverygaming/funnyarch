@@ -12,12 +12,11 @@ public:
     void init(uint32_t (*mem_read)(uint32_t addr), void (*mem_write)(uint32_t addr, uint32_t data));
     void reset();
 
-    void execute(uint32_t instrs);
+    uint32_t execute(uint32_t instrs);
 
     uint32_t regs[32];
 
 private:
-    bool shouldexecute(uint8_t condition);
     uint32_t (*mem_read)(uint32_t addr) = nullptr;
     void (*mem_write)(uint32_t addr, uint32_t data) = nullptr;
 };

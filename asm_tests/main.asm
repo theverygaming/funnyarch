@@ -5,9 +5,10 @@ rjmp main
 #include "io.asm"
 #include "tests.asm"
 #include "tests/all.asm"
+#include "memsize.asm"
 
 main:
-mov rsp, #0x2708
+mov rsp, #0x23E0
 push(lr)
 mov r0, str_mainruns
 mov r1, #0
@@ -15,12 +16,15 @@ rcall(testresult)
 rcall(alltests)
 //rcall(drawchar)
 pop(lr)
+rcall(memsize)
 loop:
 rjmp loop
 jmp #0xFFFF
 
 defstr(str_mainruns, "main runs")
 
+
+/*
 #include "font8x8.asm"
 
 drawchar:
@@ -40,12 +44,8 @@ ifgteq add r4, #1
 ifgteq mov r1, r4
 ifgteq mov r2, font8x8
 ifgteq add r10, #1
-/*cmp r4, #0x3c4c
-ifgteq mov r4, code_end
-ifgteq mov r1, r4
-ifgteq mov r2, font8x8*/
 rjmp .drawchar_p1
 
 ret()
-
+*/
 code_end:
