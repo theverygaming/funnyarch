@@ -9,9 +9,9 @@ module control (
     output reg [31:0] address,
 
     // ALU
-    output [3:0] alu_opcode,
-    output [31:0] alu_op1,
-    output [31:0] alu_op2,
+    output reg [3:0] alu_opcode,
+    output reg [31:0] alu_op1,
+    output reg [31:0] alu_op2,
     input [31:0] alu_out,
     input alu_carry,
     alu_zero
