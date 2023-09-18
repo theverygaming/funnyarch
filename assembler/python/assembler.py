@@ -133,7 +133,11 @@ instructions = {
         Instruction(InstructionType.E1, 0x1A),
         Instruction(InstructionType.E2, 0x1B),
     ],
-    # pseudoinstructions
+    "and": [
+        Instruction(InstructionType.E1, 0x1C),
+        Instruction(InstructionType.E2, 0x1D),
+        Instruction(InstructionType.E3, 0x1E),
+    ],
 }
 
 conditionmap = {
@@ -472,6 +476,23 @@ def assembleinstr(str):
         raise Exception(f"could not match instruction")
     assemble_instr(match)
 
+
+def genregex():
+    print("conditions: ", end="")
+    for key in list(conditionmap.keys())[:-1]:
+        print(f"{key}|", end="")
+    print(f"{list(conditionmap.keys())[-1]}")
+    print("instructions: ", end="")
+    for key in list(instructions.keys())[:-1]:
+        print(f"{key}|", end="")
+    print(f"{list(instructions.keys())[-1]}")
+    print("registers: ", end="")
+    for key in list(regmap.keys())[:-1]:
+        print(f"{key}|", end="")
+    print(f"{list(regmap.keys())[-1]}")
+
+
+genregex()
 
 if len(sys.argv) != 3:
     print(f"usage: {sys.argv[0]} input output")

@@ -25,13 +25,14 @@ module control (
 );
   reg [31:0] instr;
   reg [ 2:0] state;
+  reg [7:0] int_n;
 
   reg [31:0] regarr[31:0];
 
   always @(posedge clk) begin
     if (reset == 1) begin
       //$display("CPU: reset");
-      regarr[30] <= 32'h0;
+      regarr[30] <= 32'hFFFFFFFC;
       regarr[31] <= 32'b0;
 
       state <= `STATE_FETCH;
@@ -52,7 +53,8 @@ module control (
           (instr[8:6] == 3 && regarr[31][0] == 1) ||  // if less than
           (instr[8:6] == 4 && regarr[31][0] == 0) ||  // if greater than or equal
           (instr[8:6] == 5 && regarr[31][1:0] == 0) ||  // if greater than
-          (instr[8:6] == 6 && regarr[31][1:0] != 0)  // if less than or equal
+          (instr[8:6] == 6 && regarr[31][1:0] != 0) ||  // if less than or equal
+          (instr[8:6] == 7) // always
           ) begin
         //$display("CPU: decoding opcode 0x%h", instr[5:0]);
         case (instr[5:0])
@@ -140,7 +142,8 @@ module control (
             state <= `STATE_WRITEBACK;
           end
           6'h0e: begin  /* INT(E4) */
-            regarr[31][31:24] <= instr[16:9];
+            int_n <= instr[16:9];
+            // TODO: throwing an exception should not be possible with this instruction - in that case throw an invalid opcode
             state <= `STATE_INT_S1;
           end
           6'h10: begin  /* ADD(E1) */
@@ -217,8 +220,29 @@ module control (
             alu_opcode <= 4'h5;
             state <= `STATE_WRITEBACK;
           end
+          6'h1C: begin  /* AND(E1) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= regarr[instr[18:14]];
+            alu_opcode <= 4'h6;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h1D: begin  /* AND(E2) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= {19'b0, instr[31:19]};
+            alu_opcode <= 4'h6;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h1E: begin  /* AND(E3) */
+            alu_op1 <= regarr[instr[13:9]];
+            if (instr[14] == 1) alu_op2 <= {instr[31:16], 16'b0};
+            else alu_op2 <= {16'b0, instr[31:16]};
+            alu_opcode <= 4'h6;
+            state <= `STATE_WRITEBACK;
+          end
           default: begin  /* invalid opcode */
-            state <= `STATE_FETCH;
+            int_n <= 255;
+            regarr[30] <= regarr[30] - 4;
+            state <= `STATE_INT_S1;
           end
         endcase
       end else begin
@@ -294,7 +318,19 @@ module control (
           regarr[instr[18:14]] <= alu_out;
           state <= `STATE_FETCH;
         end
-        default: begin  /* invalid opcode */
+        6'h1C: begin  /* AND(E1) */
+          regarr[instr[23:19]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h1D: begin  /* AND(E2) */
+          regarr[instr[18:14]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h1E: begin  /* AND(E3) */
+          regarr[instr[13:9]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        default: begin  /* TODO: it should not be possible to reach this */
           state <= `STATE_FETCH;
         end
       endcase
@@ -310,6 +346,7 @@ module control (
     end // interrupt stage 2
     else if (state == `STATE_INT_S2) begin
       //$display("CPU: interrupt stage 2");
+      regarr[31][31:24] <= int_n;
       regarr[29] <= regarr[29] - 4;
       address = regarr[29] - 4;
       data_rw <= 1;

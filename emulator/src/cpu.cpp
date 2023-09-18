@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#define CPU_FORCEINLINE __attribute__((always_inline))
+
 // #define ISDEBUG
 
 #ifdef ISDEBUG
@@ -14,43 +16,55 @@
 
 #define INFO_PRINTF(...) fprintf(stderr, __VA_ARGS__)
 
-template <typename T> static inline void bitset(T *c, uint8_t bit, bool value) {
+template <typename T> static inline CPU_FORCEINLINE void bitset(T *c, uint8_t bit, bool value) {
     *c ^= (-value ^ *c) & (1ul << bit);
 }
 
-static inline long signexpand(unsigned long value, unsigned int bits) {
-    if ((value >> (bits - 1)) != 0) {
-        value |= ~((1ul << bits) - 1);
-    }
-    return value;
+template <typename T> static inline CPU_FORCEINLINE void bitset(T *c, uint8_t bits_start, uint8_t bits_len, T value) {
+    T mask = (1ul << bits_len) - 1;
+    T mask_shifted = mask << bits_start;
+    *c = (*c & (~mask_shifted)) | ((value & mask) << bits_start);
 }
 
-void cpu::init(uint32_t (*_mem_read)(uint32_t addr), void (*_mem_write)(uint32_t addr, uint32_t data)) {
-    mem_read = _mem_read;
-    mem_write = _mem_write;
+void cpu::init(struct cpu::ctx *ctx) {
+    cpu::reset(ctx);
 }
 
-void cpu::reset() {
-    memset(regs, 0, sizeof(regs));
-    // regs[CPU_REG_IP] = ROM_BASE;
+void cpu::reset(struct cpu::ctx *ctx) {
+    memset(ctx->regs, 0, sizeof(ctx->regs));
+    ctx->regs[CPU_REG_IP] = 0xFFFFFFFC;
 }
 
-static inline bool shouldexecute(cpu *cpu, uint8_t condition) {
+static inline CPU_FORCEINLINE uint32_t interrupt(struct cpu::ctx *ctx, uint8_t n) {
+    // push rip
+    ctx->regs[CPU_REG_SP] -= 4;
+    cpu::mem_write(ctx, ctx->regs[CPU_REG_SP], ctx->regs[CPU_REG_IP]);
+    // push flags
+    ctx->regs[CPU_REG_SP] -= 4;
+    cpu::mem_write(ctx, ctx->regs[CPU_REG_SP], ctx->regs[CPU_REG_FLAGS]);
+    // set interrupt number in flags
+    bitset(&ctx->regs[CPU_REG_FLAGS], 24, 8, (uint32_t)n);
+    // jump
+    ctx->regs[CPU_REG_IP] = ctx->regs[CPU_REG_IPTR] & 0xFFFFFFFC;
+    return 2; // interrupt takes two cycles
+}
+
+static inline CPU_FORCEINLINE bool shouldexecute(struct cpu::ctx *ctx, unsigned int condition) {
     switch (condition) {
     default: // always
         return true;
     case 1: // if equal
-        return (cpu->regs[CPU_REG_FLAGS] & 0b10) != 0;
+        return (ctx->regs[CPU_REG_FLAGS] & 0b10) != 0;
     case 2: // if not equal
-        return (cpu->regs[CPU_REG_FLAGS] & 0b10) == 0;
+        return (ctx->regs[CPU_REG_FLAGS] & 0b10) == 0;
     case 3: // if less than
-        return (cpu->regs[CPU_REG_FLAGS] & 0b01) != 0;
+        return (ctx->regs[CPU_REG_FLAGS] & 0b01) != 0;
     case 4: // if greater than or equal
-        return (cpu->regs[CPU_REG_FLAGS] & 0b01) == 0;
+        return (ctx->regs[CPU_REG_FLAGS] & 0b01) == 0;
     case 5: // if greater than
-        return (cpu->regs[CPU_REG_FLAGS] & 0b11) == 0;
+        return (ctx->regs[CPU_REG_FLAGS] & 0b11) == 0;
     case 6: // if less than or equal
-        return (cpu->regs[CPU_REG_FLAGS] & 0b11) != 0;
+        return (ctx->regs[CPU_REG_FLAGS] & 0b11) != 0;
     }
 }
 
@@ -66,34 +80,34 @@ union enc_1 {
     } str;
 };
 
-union enc_2 {
+template <typename immtype> union enc_2 {
     uint32_t instr;
     struct __attribute__((packed)) {
         unsigned int opcode : 6;
         unsigned int condition : 3;
         unsigned int src : 5;
         unsigned int tgt : 5;
-        unsigned long imm13 : 13;
+        immtype imm13 : 13;
     } str;
 };
 
-union enc_3 {
+template <typename immtype> union enc_3 {
     uint32_t instr;
     struct __attribute__((packed)) {
         unsigned int opcode : 6;
         unsigned int condition : 3;
         unsigned int tgt : 5;
         unsigned int instr_spe : 2;
-        unsigned long imm16 : 16;
+        immtype imm16 : 16;
     } str;
 };
 
-union enc_4 {
+template <typename immtype> union enc_4 {
     uint32_t instr;
     struct __attribute__((packed)) {
         unsigned int opcode : 6;
         unsigned int condition : 3;
-        unsigned long imm23 : 23;
+        immtype imm23 : 23;
     } str;
 };
 
@@ -127,21 +141,21 @@ union enc_7 {
     } str;
 };
 
-uint32_t cpu::execute(uint32_t instrs) {
+uint32_t cpu::execute(struct cpu::ctx *ctx, uint32_t instrs) {
     uint32_t clock_cycles = 0;
 begin:
-    uint32_t instr = mem_read(regs[CPU_REG_IP] & 0xFFFFFFFC);
-    regs[CPU_REG_IP] += 4;
+    uint32_t instr = cpu::mem_read(ctx, ctx->regs[CPU_REG_IP] & 0xFFFFFFFC);
+    ctx->regs[CPU_REG_IP] += 4;
     uint8_t opcode = instr & 0x3F;
     uint8_t cond = (instr >> 6) & 0x07;
 
-    if (!shouldexecute(this, cond)) {
+    if (!shouldexecute(ctx, cond)) {
         DEBUG_PRINTF("SKIPPING ");
-        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
         goto finish;
     }
 
-    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
 
     switch (opcode) {
     case 0x00: { /* NOP(E6) */
@@ -150,26 +164,26 @@ begin:
     }
 
     case 0x01: { /* STRPI(E2) */
-        union enc_2 e;
+        union enc_2<long> e;
         e.instr = instr;
-        regs[e.str.tgt] += signexpand(e.str.imm13, 13);
-        mem_write(regs[e.str.tgt], regs[e.str.src]);
+        ctx->regs[e.str.tgt] += e.str.imm13;
+        cpu::mem_write(ctx, ctx->regs[e.str.tgt], ctx->regs[e.str.src]);
         clock_cycles += 2;
         break;
     }
 
     case 0x02: { /* JMP(E4) */
-        union enc_4 e;
+        union enc_4<unsigned long> e;
         e.instr = instr;
-        regs[CPU_REG_IP] = e.str.imm23 * 4;
+        ctx->regs[CPU_REG_IP] = e.str.imm23 * 4;
         clock_cycles += 2;
         break;
     }
 
     case 0x03: { /* RJMP(E4) */
-        union enc_4 e;
+        union enc_4<long> e;
         e.instr = instr;
-        regs[CPU_REG_IP] += signexpand(e.str.imm23, 23) * 4;
+        ctx->regs[CPU_REG_IP] += e.str.imm23 * 4;
         clock_cycles += 2;
         break;
     }
@@ -177,71 +191,71 @@ begin:
     case 0x04: { /* MOV(E7) */
         union enc_7 e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src];
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src];
         clock_cycles += 2;
         break;
     }
 
     case 0x05: { /* MOV(E3) */
-        union enc_3 e;
+        union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
-            regs[e.str.tgt] = (regs[e.str.tgt] & 0xFFFF) | (e.str.imm16 << 16);
+            ctx->regs[e.str.tgt] = (ctx->regs[e.str.tgt] & 0xFFFF) | (e.str.imm16 << 16);
         } else {
-            regs[e.str.tgt] = e.str.imm16;
+            ctx->regs[e.str.tgt] = e.str.imm16;
         }
         clock_cycles += 2;
         break;
     }
 
     case 0x06: { /* LDR(E2) */
-        union enc_2 e;
+        union enc_2<long> e;
         e.instr = instr;
-        regs[e.str.tgt] = mem_read(regs[e.str.src] + signexpand(e.str.imm13, 13));
+        ctx->regs[e.str.tgt] = cpu::mem_read(ctx, ctx->regs[e.str.src] + e.str.imm13);
         clock_cycles += 3;
         break;
     }
 
     case 0x07: { /* LDRI(E2) */
-        union enc_2 e;
+        union enc_2<long> e;
         e.instr = instr;
-        regs[e.str.tgt] = mem_read(regs[e.str.src]);
-        regs[e.str.src] += signexpand(e.str.imm13, 13);
+        ctx->regs[e.str.tgt] = cpu::mem_read(ctx, ctx->regs[e.str.src]);
+        ctx->regs[e.str.src] += e.str.imm13;
         clock_cycles += 3;
         break;
     }
 
     case 0x08: { /* STR(E2) */
-        union enc_2 e;
+        union enc_2<long> e;
         e.instr = instr;
-        mem_write(regs[e.str.tgt] + signexpand(e.str.imm13, 13), regs[e.str.src]);
+        cpu::mem_write(ctx, ctx->regs[e.str.tgt] + e.str.imm13, ctx->regs[e.str.src]);
         clock_cycles += 2;
         break;
     }
 
     case 0x09: { /* STRI(E2) */
-        union enc_2 e;
+        union enc_2<long> e;
         e.instr = instr;
-        mem_write(regs[e.str.tgt], regs[e.str.src]);
-        regs[e.str.tgt] += signexpand(e.str.imm13, 13);
+        cpu::mem_write(ctx, ctx->regs[e.str.tgt], ctx->regs[e.str.src]);
+        ctx->regs[e.str.tgt] += e.str.imm13;
         clock_cycles += 2;
         break;
     }
 
     case 0x0a: { /* JAL(E4) */
-        union enc_4 e;
+        union enc_4<unsigned long> e;
         e.instr = instr;
-        regs[CPU_REG_LR] = regs[CPU_REG_IP];
-        regs[CPU_REG_IP] = e.str.imm23 * 4;
+        ctx->regs[CPU_REG_LR] = ctx->regs[CPU_REG_IP];
+        ctx->regs[CPU_REG_IP] = e.str.imm23 * 4;
         clock_cycles += 2;
         break;
     }
 
     case 0x0b: { /* RJAL(E4) */
-        union enc_4 e;
+        union enc_4<long> e;
         e.instr = instr;
-        regs[CPU_REG_LR] = regs[CPU_REG_IP];
-        regs[CPU_REG_IP] += signexpand(e.str.imm23, 23) * 4;
+        ctx->regs[CPU_REG_LR] = ctx->regs[CPU_REG_IP];
+        ctx->regs[CPU_REG_IP] += e.str.imm23 * 4;
         clock_cycles += 2;
         break;
     }
@@ -250,47 +264,56 @@ begin:
         union enc_7 e;
         e.instr = instr;
         uint32_t result;
-        bool carry = __builtin_sub_overflow(regs[e.str.tgt], regs[e.str.src], &result);
-        bitset(&regs[CPU_REG_FLAGS], 0, carry);
-        bitset(&regs[CPU_REG_FLAGS], 1, result == 0);
+        bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], ctx->regs[e.str.src], &result);
+        bitset(&ctx->regs[CPU_REG_FLAGS], 0, carry);
+        bitset(&ctx->regs[CPU_REG_FLAGS], 1, result == 0);
         clock_cycles += 3;
         break;
     }
 
     case 0x0d: { /* CMP(E3) */
-        union enc_3 e;
+        union enc_3<unsigned long> e;
         e.instr = instr;
         uint32_t result;
-        bool carry = __builtin_sub_overflow(regs[e.str.tgt], e.str.imm16, &result);
-        bitset(&regs[CPU_REG_FLAGS], 0, carry);
-        bitset(&regs[CPU_REG_FLAGS], 1, result == 0);
+        bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], e.str.imm16, &result);
+        bitset(&ctx->regs[CPU_REG_FLAGS], 0, carry);
+        bitset(&ctx->regs[CPU_REG_FLAGS], 1, result == 0);
         clock_cycles += 3;
+        break;
+    }
+
+    case 0x0e: { /* INT(E4) */
+        union enc_4<unsigned long> e;
+        e.instr = instr;
+        // TODO: throwing an exception should not be possible with this instruction - in that case throw an invalid opcode
+        clock_cycles += interrupt(ctx, e.str.imm23 & 0xFF);
+        clock_cycles += 2;
         break;
     }
 
     case 0x10: { /* ADD(E1) */
         union enc_1 e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src1] + regs[e.str.src2];
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src1] + ctx->regs[e.str.src2];
         clock_cycles += 3;
         break;
     }
 
     case 0x11: { /* ADD(E2) */
-        union enc_2 e;
+        union enc_2<unsigned long> e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src] + e.str.imm13;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src] + e.str.imm13;
         clock_cycles += 3;
         break;
     }
 
     case 0x12: { /* ADD(E3) */
-        union enc_3 e;
+        union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
-            regs[e.str.tgt] += e.str.imm16 << 16;
+            ctx->regs[e.str.tgt] += e.str.imm16 << 16;
         } else {
-            regs[e.str.tgt] += e.str.imm16;
+            ctx->regs[e.str.tgt] += e.str.imm16;
         }
         clock_cycles += 3;
         break;
@@ -299,26 +322,26 @@ begin:
     case 0x13: { /* SUB(E1) */
         union enc_1 e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src1] - regs[e.str.src2];
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src1] - ctx->regs[e.str.src2];
         clock_cycles += 3;
         break;
     }
 
     case 0x14: { /* SUB(E2) */
-        union enc_2 e;
+        union enc_2<unsigned long> e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src] - e.str.imm13;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src] - e.str.imm13;
         clock_cycles += 3;
         break;
     }
 
     case 0x15: { /* SUB(E3) */
-        union enc_3 e;
+        union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
-            regs[e.str.tgt] -= e.str.imm16 << 16;
+            ctx->regs[e.str.tgt] -= e.str.imm16 << 16;
         } else {
-            regs[e.str.tgt] -= e.str.imm16;
+            ctx->regs[e.str.tgt] -= e.str.imm16;
         }
         clock_cycles += 3;
         break;
@@ -327,15 +350,15 @@ begin:
     case 0x16: { /* SHL(E1) */
         union enc_1 e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src2] <= 31 ? (regs[e.str.src1] << regs[e.str.src2]) : 0;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src2] <= 31 ? (ctx->regs[e.str.src1] << ctx->regs[e.str.src2]) : 0;
         clock_cycles += 3;
         break;
     }
 
     case 0x17: { /* SHL(E2) */
-        union enc_2 e;
+        union enc_2<unsigned long> e;
         e.instr = instr;
-        regs[e.str.tgt] = e.str.imm13 <= 31 ? (regs[e.str.src] << e.str.imm13) : 0;
+        ctx->regs[e.str.tgt] = e.str.imm13 <= 31 ? (ctx->regs[e.str.src] << e.str.imm13) : 0;
         clock_cycles += 3;
         break;
     }
@@ -343,15 +366,15 @@ begin:
     case 0x18: { /* SHR(E1) */
         union enc_1 e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src2] <= 31 ? (regs[e.str.src1] >> regs[e.str.src2]) : 0;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src2] <= 31 ? (ctx->regs[e.str.src1] >> ctx->regs[e.str.src2]) : 0;
         clock_cycles += 3;
         break;
     }
 
     case 0x19: { /* SHR(E2) */
-        union enc_2 e;
+        union enc_2<unsigned long> e;
         e.instr = instr;
-        regs[e.str.tgt] = e.str.imm13 <= 31 ? (regs[e.str.src] >> e.str.imm13) : 0;
+        ctx->regs[e.str.tgt] = e.str.imm13 <= 31 ? (ctx->regs[e.str.src] >> e.str.imm13) : 0;
         clock_cycles += 3;
         break;
     }
@@ -359,21 +382,51 @@ begin:
     case 0x1A: { /* SAR(E1) */
         union enc_1 e;
         e.instr = instr;
-        regs[e.str.tgt] = regs[e.str.src2] <= 31 ? ((int32_t)regs[e.str.src1] >> regs[e.str.src2]) : 0;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src2] <= 31 ? ((int32_t)ctx->regs[e.str.src1] >> ctx->regs[e.str.src2]) : 0;
         clock_cycles += 3;
         break;
     }
 
     case 0x1B: { /* SAR(E2) */
-        union enc_2 e;
+        union enc_2<unsigned long> e;
         e.instr = instr;
-        regs[e.str.tgt] = e.str.imm13 <= 31 ? ((int32_t)regs[e.str.src] >> e.str.imm13) : 0;
+        ctx->regs[e.str.tgt] = e.str.imm13 <= 31 ? ((int32_t)ctx->regs[e.str.src] >> e.str.imm13) : 0;
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x1C: { /* AND(E1) */
+        union enc_1 e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src1] & ctx->regs[e.str.src2];
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x1D: { /* AND(E2) */
+        union enc_2<unsigned long> e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src] & e.str.imm13;
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x1E: { /* AND(E3) */
+        union enc_3<unsigned long> e;
+        e.instr = instr;
+        if (e.str.instr_spe == 0b01) {
+            ctx->regs[e.str.tgt] &= e.str.imm16 << 16;
+        } else {
+            ctx->regs[e.str.tgt] &= e.str.imm16;
+        }
         clock_cycles += 3;
         break;
     }
 
     default:
-        INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        ctx->regs[CPU_REG_IP] -= 4;
+        clock_cycles += interrupt(ctx, 255) + 1;
         // throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 finish:

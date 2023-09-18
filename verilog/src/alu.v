@@ -9,7 +9,7 @@ module alu (
   wire signed [31:0] in1s = in1;
   wire signed [31:0] in2s = in2;
   reg [32:0] tmp;
-  always @(*) begin
+  always @(opcode or in1 or in2) begin
     case (opcode)
       4'h1: tmp = {1'b0, in1} + {1'b0, in2};  /* add */
       4'h2: tmp = {1'b0, in1} - {1'b0, in2};  /* sub */

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Funnyarch Assembly",
+  "patterns": [
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#comments"
+    }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.condition.funnyarch-asm",
+          "match": "^(always|ifz|ifeq|ifnz|ifneq|ifc|iflt|ifnc|ifgteq|ifnzc|ifgt|ifzoc|iflteq)\\b"
+        },
+        {
+          "name": "support.function.funnyarch-asm",
+          "match": "\\b(nop|jmp|rjmp|mov|ldr|ldri|str|stri|strpi|jal|rjal|cmp|int|add|sub|shl|shr|sar)\\b"
+        },
+        {
+          "name": "storage.register.funnyarch-asm",
+          "match": "\\b(r0|r1|r2|r3|r4|r5|r6|r7|r8|r9|r10|r11|r12|r13|r14|r15|r16|r17|r18|r19|r20|r21|r22|r23|r24|r25|r26|iptr|lr|rsp|rip|rf)\\b"
+        },
+        {
+          "name": "keyword.assemblerdirective.funnyarch-asm",
+          "match": "^\\.(export|extern|string|ascii|byte|origin|align)(?!:).*$"
+        },
+        {
+          "name": "keyword.control.include.funnyarch-asm",
+          "match": "^#include +\"([^\"]+)\".*$"
+        },
+        {
+          "name": "constant.numeric.immediate.funnyarch-asm",
+          "match": "(#(?:\\d+|0x[\\dA-F]+|(?:0b|0B)[0-1]+))\\b"
+        },
+        {
+          "name": "keyword.label.funnyarch-asm",
+          "match": "^([A-Za-z0-9_.]+)\\:$"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.funnyarch-asm",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.funnyarch-asm",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.funnyarch-asm",
+          "begin": "/\\*",
+          "end": "\\*/"
+        },
+        {
+          "name": "comment.line.double-slash.funnyarch-asm",
+          "begin": "//",
+          "end": "\\n"
+        }
+      ]
+    }
+  },
+  "scopeName": "source.funnyarch-asm"
+}

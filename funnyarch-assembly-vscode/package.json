@@ -1,0 +1,34 @@
+{
+  "name": "funnyarch-assembly-vscode",
+  "displayName": "Funnyarch Assembly",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.81.1"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "funnyarch-asm",
+        "aliases": [
+          "Funnyarch Assembly",
+          "funnyarch-asm"
+        ],
+        "extensions": [
+          ".asm"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "funnyarch-asm",
+        "scopeName": "source.funnyarch-asm",
+        "path": "./syntaxes/funnyarch-asm.tmLanguage.json"
+      }
+    ]
+  }
+}

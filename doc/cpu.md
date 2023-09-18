@@ -37,11 +37,23 @@
 
 ### rf (flags register)
 
-| bits | description |
-| ---- | ----------- |
-| 0    | carry flag  |
-| 1    | zero flag   |
-| 31:2 | reserved    |
+| bits  | description      |
+| ----- | ---------------- |
+| 0     | carry flag       |
+| 1     | zero flag        |
+| 23:2  | reserved         |
+| 31:24 | interrupt number |
+
+## Interrupts / Exceptions
+
+There are 256 different interrupt numbers. On interrupt the CPU pushes `rip`(pointing to the _next_ instruction in case of an interrupt and to the _current_ instruction in case of an exception) and `rf`, then the interrupt number will be set in `rf`.
+The CPU will jump to the address in `iptr` (ignoring the lower two bits).
+
+| number | type                        | description     |
+| ------ | --------------------------- | --------------- |
+| 0-254  | Hardware/Software Interrupt |                 |
+| 255    | Exception                   | Invalid opcode  |
+| 254    | Exception                   | Alignment error |
 
 ## Instruction encoding
 
@@ -58,6 +70,7 @@ All instructions are 32 bits in length. They can all be executed conditionally
 | 4     | ifnc/ifgteq  | tgt >= src   | execute if carry flag is not set                 |
 | 5     | ifnzc/ifgt   | tgt > src    | execute if both carry and zero flags are not set |
 | 6     | ifzoc/iflteq | tgt <= src   | execute if zero flag or carry flag is set        |
+| 7     | always       | unconditinal | always execute (this may change in the future!!) |
 
 ### E1
 
@@ -176,6 +189,10 @@ Assembler syntax: `cond instr tgt, src`
 |        |       |           |              |                                                                                       |
 | 0x1A   | sar   | [E1](#e1) | 3            | target = source1 >>> source2                                                          |
 | 0x1B   | sar   | [E2](#e2) | 3            | target = source >>> imm13                                                             |
+|        |       |           |              |                                                                                       |
+| 0x1C   | and   | [E1](#e1) | 3            | target = source1 & source2                                                            |
+| 0x1D   | and   | [E2](#e2) | 3            | target = source & imm13                                                               |
+| 0x1E   | and   | [E3](#e3) | 3            | target = target & imm16 OR target = target & (imm16 << 16) if bit 14 set              |
 
 <!-- TODO: fix this  -->
 
