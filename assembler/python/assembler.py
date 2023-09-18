@@ -138,6 +138,19 @@ instructions = {
         Instruction(InstructionType.E2, 0x1D),
         Instruction(InstructionType.E3, 0x1E),
     ],
+    "or": [
+        Instruction(InstructionType.E1, 0x1F),
+        Instruction(InstructionType.E2, 0x20),
+        Instruction(InstructionType.E3, 0x21),
+    ],
+    "xor": [
+        Instruction(InstructionType.E1, 0x22),
+        Instruction(InstructionType.E2, 0x23),
+        Instruction(InstructionType.E3, 0x24),
+    ],
+    "not": [
+        Instruction(InstructionType.E7, 0x25),
+    ],
 }
 
 conditionmap = {

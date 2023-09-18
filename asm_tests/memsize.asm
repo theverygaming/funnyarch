@@ -8,8 +8,8 @@ ldr r2, r1, #0 // r2 contains data @r1
 str r1, r1, #0 // store current address @r1
 ldr r3, r1, #0 // r3 contains data @r1
 cmp r3, r1
-ifeq add r10, #1
-stri r1, r2, #1 // restore old data
+ifeq add r10, #4
+ifeq stri r1, r2, #4 // restore old data
 cmp r1, r4
 iflt rjmp .memsize_loop
 ret()

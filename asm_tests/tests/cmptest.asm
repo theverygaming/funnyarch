@@ -56,4 +56,4 @@ rcall(testresult)
 pop(lr)
 ret()
 
-defstr(cmptest_str, "compare")
+defstr(cmptest_str, "CMP")

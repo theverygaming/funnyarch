@@ -25,7 +25,7 @@ module control (
 );
   reg [31:0] instr;
   reg [ 2:0] state;
-  reg [7:0] int_n;
+  reg [ 7:0] int_n;
 
   reg [31:0] regarr[31:0];
 
@@ -54,7 +54,7 @@ module control (
           (instr[8:6] == 4 && regarr[31][0] == 0) ||  // if greater than or equal
           (instr[8:6] == 5 && regarr[31][1:0] == 0) ||  // if greater than
           (instr[8:6] == 6 && regarr[31][1:0] != 0) ||  // if less than or equal
-          (instr[8:6] == 7) // always
+          (instr[8:6] == 7)  // always
           ) begin
         //$display("CPU: decoding opcode 0x%h", instr[5:0]);
         case (instr[5:0])
@@ -239,6 +239,49 @@ module control (
             alu_opcode <= 4'h6;
             state <= `STATE_WRITEBACK;
           end
+          6'h1F: begin  /* OR(E1) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= regarr[instr[18:14]];
+            alu_opcode <= 4'h7;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h20: begin  /* OR(E2) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= {19'b0, instr[31:19]};
+            alu_opcode <= 4'h7;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h21: begin  /* OR(E3) */
+            alu_op1 <= regarr[instr[13:9]];
+            if (instr[14] == 1) alu_op2 <= {instr[31:16], 16'b0};
+            else alu_op2 <= {16'b0, instr[31:16]};
+            alu_opcode <= 4'h7;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h22: begin  /* XOR(E1) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= regarr[instr[18:14]];
+            alu_opcode <= 4'h8;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h23: begin  /* XOR(E2) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_op2 <= {19'b0, instr[31:19]};
+            alu_opcode <= 4'h8;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h24: begin  /* XOR(E3) */
+            alu_op1 <= regarr[instr[13:9]];
+            if (instr[14] == 1) alu_op2 <= {instr[31:16], 16'b0};
+            else alu_op2 <= {16'b0, instr[31:16]};
+            alu_opcode <= 4'h8;
+            state <= `STATE_WRITEBACK;
+          end
+          6'h25: begin  /* NOT(E7) */
+            alu_op1 <= regarr[instr[13:9]];
+            alu_opcode <= 4'h9;
+            state <= `STATE_WRITEBACK;
+          end
           default: begin  /* invalid opcode */
             int_n <= 255;
             regarr[30] <= regarr[30] - 4;
@@ -330,7 +373,36 @@ module control (
           regarr[instr[13:9]] <= alu_out;
           state <= `STATE_FETCH;
         end
+        6'h1F: begin  /* OR(E1) */
+          regarr[instr[23:19]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h20: begin  /* OR(E2) */
+          regarr[instr[18:14]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h21: begin  /* OR(E3) */
+          regarr[instr[13:9]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h22: begin  /* XOR(E1) */
+          regarr[instr[23:19]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h23: begin  /* XOR(E2) */
+          regarr[instr[18:14]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h24: begin  /* XOR(E3) */
+          regarr[instr[13:9]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
+        6'h25: begin  /* NOT(E7) */
+          regarr[instr[18:14]] <= alu_out;
+          state <= `STATE_FETCH;
+        end
         default: begin  /* TODO: it should not be possible to reach this */
+          $display("UNREACHABLE EXECUTED!!!");
           state <= `STATE_FETCH;
         end
       endcase

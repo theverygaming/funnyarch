@@ -193,6 +193,16 @@ Assembler syntax: `cond instr tgt, src`
 | 0x1C   | and   | [E1](#e1) | 3            | target = source1 & source2                                                            |
 | 0x1D   | and   | [E2](#e2) | 3            | target = source & imm13                                                               |
 | 0x1E   | and   | [E3](#e3) | 3            | target = target & imm16 OR target = target & (imm16 << 16) if bit 14 set              |
+|        |       |           |              |                                                                                       |
+| 0x1F   | or    | [E1](#e1) | 3            | target = source1 \| source2                                                           |
+| 0x20   | or    | [E2](#e2) | 3            | target = source \| imm13                                                              |
+| 0x21   | or    | [E3](#e3) | 3            | target = target \| imm16 OR target = target \| (imm16 << 16) if bit 14 set            |
+|        |       |           |              |                                                                                       |
+| 0x22   | xor   | [E1](#e1) | 3            | target = source1 ^ source2                                                            |
+| 0x23   | xor   | [E2](#e2) | 3            | target = source ^ imm13                                                               |
+| 0x24   | xor   | [E3](#e3) | 3            | target = target ^ imm16 OR target = target ^ (imm16 << 16) if bit 14 set              |
+|        |       |           |              |                                                                                       |
+| 0x25   | not   | [E7](#e7) | 3            | target = ~source                                                                      |
 
 <!-- TODO: fix this  -->
 

@@ -423,6 +423,70 @@ begin:
         break;
     }
 
+    case 0x1F: { /* OR(E1) */
+        union enc_1 e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src1] | ctx->regs[e.str.src2];
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x20: { /* OR(E2) */
+        union enc_2<unsigned long> e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src] | e.str.imm13;
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x21: { /* OR(E3) */
+        union enc_3<unsigned long> e;
+        e.instr = instr;
+        if (e.str.instr_spe == 0b01) {
+            ctx->regs[e.str.tgt] |= e.str.imm16 << 16;
+        } else {
+            ctx->regs[e.str.tgt] |= e.str.imm16;
+        }
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x22: { /* XOR(E1) */
+        union enc_1 e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src1] ^ ctx->regs[e.str.src2];
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x23: { /* XOR(E2) */
+        union enc_2<unsigned long> e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ctx->regs[e.str.src] ^ e.str.imm13;
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x24: { /* XOR(E3) */
+        union enc_3<unsigned long> e;
+        e.instr = instr;
+        if (e.str.instr_spe == 0b01) {
+            ctx->regs[e.str.tgt] ^= e.str.imm16 << 16;
+        } else {
+            ctx->regs[e.str.tgt] ^= e.str.imm16;
+        }
+        clock_cycles += 3;
+        break;
+    }
+
+    case 0x25: { /* NOT(E7) */
+        union enc_7 e;
+        e.instr = instr;
+        ctx->regs[e.str.tgt] = ~ctx->regs[e.str.src];
+        clock_cycles += 3;
+        break;
+    }
+
     default:
         INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
         ctx->regs[CPU_REG_IP] -= 4;

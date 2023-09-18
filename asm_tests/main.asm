@@ -11,7 +11,7 @@ rjmp main
 main:
 mov rsp, #0x23E0
 mov iptr, int_handler
-int #0
+int #0 // FIXME: we need a proper test for interrupts (and exceptions)
 push(lr)
 mov r0, str_mainruns
 mov r1, #0
