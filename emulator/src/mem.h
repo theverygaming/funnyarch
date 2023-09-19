@@ -3,7 +3,8 @@
 
 #include "mmio.h"
 
-#define RAM_BYTES (4096)
+#define FB_LEN    ((640 * 480) / 8)
+#define RAM_BYTES (((640 * 480) / 8) + 4096)
 #define ROM_BYTES (1 * 8192)
 #define ROM_BASE  (0)
 #define RAM_BASE  (0x2000)
@@ -15,6 +16,7 @@ namespace mem {
 
     extern uint8_t *mem_ram;
     extern uint8_t *mem_rom;
+    extern void *fb_base;
 
     template <typename T> inline T read(uint32_t addr) {
         if (addr < (RAM_BASE + (RAM_BYTES - 4)) && addr >= RAM_BASE) {

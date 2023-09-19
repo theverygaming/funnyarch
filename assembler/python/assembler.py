@@ -204,6 +204,8 @@ regmap = {
     "rf": 31,
 }
 
+regmap_alias = {}
+
 
 class AssembledInstr:
     def __init__(self, type, opcode, condition, operands, instrspecific):
@@ -263,6 +265,9 @@ def get_operand_type(opstr):
         if str in regmap:
             isreg = True
             rval = regmap[str]
+        elif str in regmap_alias:
+            isreg = True
+            rval = regmap_alias[str]
         elif str[0] == "#":
             rval = int(str[1:], 0)
         else:
@@ -456,6 +461,11 @@ def parse_assembler_directive(str):
         write_out(1, int(split[1], 0))
     elif split[0] == ".align":
         align_outfile(int(split[1], 0))
+    elif split[0] == ".regalias":
+        assert split[1] in regmap, "alias register not in register map"
+        regmap_alias[split[2]] = regmap[split[1]]
+    elif split[0] == ".regaliasclear":
+        regmap_alias.clear()
     else:
         raise Exception(f"unsupported: {split[0]}")
 
@@ -472,7 +482,7 @@ rg_arg = r"[A-Za-z0-9#\-_.]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
 rg_directive = (
-    r"^\.(export|extern|string|ascii|byte|origin|align)(?!:).*$"  # matches ".directive"
+    r"^\.(export|extern|string|ascii|byte|origin|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"
 )
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 

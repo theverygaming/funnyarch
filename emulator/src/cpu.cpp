@@ -152,6 +152,7 @@ begin:
     if (!shouldexecute(ctx, cond)) {
         DEBUG_PRINTF("SKIPPING ");
         DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        clock_cycles += 2;
         goto finish;
     }
 
@@ -286,8 +287,8 @@ begin:
         union enc_4<unsigned long> e;
         e.instr = instr;
         // TODO: throwing an exception should not be possible with this instruction - in that case throw an invalid opcode
-        clock_cycles += interrupt(ctx, e.str.imm23 & 0xFF);
         clock_cycles += 2;
+        clock_cycles += interrupt(ctx, e.str.imm23 & 0xFF);
         break;
     }
 
@@ -490,7 +491,8 @@ begin:
     default:
         INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
         ctx->regs[CPU_REG_IP] -= 4;
-        clock_cycles += interrupt(ctx, 255) + 1;
+        clock_cycles += 1;
+        clock_cycles += interrupt(ctx, 255);
         // throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 finish:
