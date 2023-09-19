@@ -1,4 +1,8 @@
 #pragma once
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_sdl2.h"
+#include "imgui/imgui_impl_sdlrenderer2.h"
 #include <SDL2/SDL.h>
 #include <cstdbool>
 #include <cstddef>
@@ -21,8 +25,23 @@ static inline void put_pixel_bw(SDL_Surface *surface, unsigned int x, unsigned i
 class SDL {
 public:
     SDL() {
-        SDL_Init(SDL_INIT_VIDEO);
-        sdlwin = SDL_CreateWindow("funnyarch", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, 0);
+        if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+            exit(1);
+        }
+
+        sdl_window = SDL_CreateWindow("funnyarch", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, 0);
+
+        sdl_renderer = SDL_CreateRenderer(sdl_window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
+        SDL_RendererInfo info;
+        SDL_GetRendererInfo(sdl_renderer, &info);
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
+
+        SDL_Log("Current SDL_Renderer: %s", info.name);
+
+        sdl_fb_texture = SDL_CreateTexture(sdl_renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
+        sdl_fb_surface = SDL_CreateRGBSurfaceFrom(NULL, width, height, 32, 0, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
+
+        imgui_init();
     }
 
     void set_buf(void *buf, size_t buf_size) {
@@ -33,58 +52,54 @@ public:
     bool update_events() {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
+            imgui_process_event(&event);
+            if ((event.type == SDL_QUIT) || (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
+                                             event.window.windowID == SDL_GetWindowID(sdl_window))) {
                 return false;
             }
         }
         return true;
     }
 
-    void full_redraw(void *buf, size_t buf_size) {
-        SDL_Surface *surface = SDL_GetWindowSurface(sdlwin);
-        for (size_t y = 0; y < height; y++) {
-            for (size_t x = 0; x < width / 8; x++) {
-                size_t idx = (y * (width / 8)) + x;
-                if (idx >= buf_size) {
-                    break;
-                }
-                uint8_t byte = ((uint8_t *)buf)[idx];
-                for (int i = 0; i < 8; i++) {
-                    put_pixel_bw(surface, (x * 8) + i, y, (byte & (1 << i)) != 0);
-                }
-            }
-        }
-        SDL_UpdateWindowSurface(sdlwin);
-    }
-
     void redraw() {
-        if (!dirty) {
-            return;
-        }
+        imgui_start_render();
 
-        SDL_Surface *surface = SDL_GetWindowSurface(sdlwin);
-        for (size_t y = dirty_y1; y <= dirty_y2; y++) {
-            for (size_t x = dirty_x1; x <= dirty_x2; x += 8) {
-                size_t idx = ((uint64_t)(y * width) + x) / 8;
-                if (idx >= _buf_size) {
-                    goto cleanup;
-                }
-                uint8_t byte = ((uint8_t *)_buf)[idx];
-                for (unsigned int i = 0; i < 8; i++) {
-                    unsigned int xpos = x + i;
-                    unsigned int ypos = y + (xpos / width);
-                    xpos %= width;
-                    if (ypos >= height) {
+        SDL_LockTexture(sdl_fb_texture, NULL, &sdl_fb_surface->pixels, &sdl_fb_surface->pitch);
+        if (dirty) {
+            for (size_t y = dirty_y1; y <= dirty_y2; y++) {
+                for (size_t x = dirty_x1; x <= dirty_x2; x += 8) {
+                    size_t idx = ((uint64_t)(y * width) + x) / 8;
+                    if (idx >= _buf_size) {
                         goto cleanup;
                     }
-                    put_pixel_bw(SDL_GetWindowSurface(sdlwin), xpos, ypos, (byte & (1 << i)) != 0);
+                    uint8_t byte = ((uint8_t *)_buf)[idx];
+                    for (unsigned int i = 0; i < 8; i++) {
+                        unsigned int xpos = x + i;
+                        unsigned int ypos = y + (xpos / width);
+                        xpos %= width;
+                        if (ypos >= height) {
+                            goto cleanup;
+                        }
+                        put_pixel_bw(sdl_fb_surface, xpos, ypos, (byte & (1 << i)) != 0);
+                    }
                 }
             }
+            dirty = false;
+            reset_dirty_rectangle();
         }
+
     cleanup:
-        SDL_UpdateWindowSurface(sdlwin);
-        dirty = false;
-        reset_dirty_rectangle();
+        SDL_Rect rect = {
+            .x = 0,
+            .y = 0,
+            .w = width,
+            .h = height,
+        };
+
+        SDL_UnlockTexture(sdl_fb_texture);
+        SDL_RenderCopy(sdl_renderer, sdl_fb_texture, NULL, &rect);
+
+        imgui_end_render();
     }
 
     inline uint32_t mem_read(uint32_t _address) {}
@@ -101,24 +116,47 @@ public:
         unsigned int x = (address * 8) % width;
         dirty = true;
         update_dirty_rectangle(x, y);
-        /*
-        SDL_Surface *surface = SDL_GetWindowSurface(sdlwin);
-        for (int i = 0; i < 4; i++) {
-            uint8_t byte = (value >> (i * 8)) & 0xFF;
-            for (int j = 0; j < 8; j++) {
-                unsigned int xpos = x + (i * 8) + j;
-                unsigned int ypos = y + (xpos / width);
-                xpos %= width;
-                if (ypos >= height) {
-                    return;
-                }
-                put_pixel_bw(surface, xpos, ypos, (byte & (1 << j)) != 0);
-            }
-        }*/
+    }
+
+    void imgui_init() {
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui_ImplSDL2_InitForSDLRenderer(sdl_window, sdl_renderer);
+        ImGui_ImplSDLRenderer2_Init(sdl_renderer);
+    }
+
+    void imgui_process_event(SDL_Event *event) {
+        ImGui_ImplSDL2_ProcessEvent(event);
+    }
+
+    void imgui_start_render() {
+        ImGui_ImplSDLRenderer2_NewFrame();
+        ImGui_ImplSDL2_NewFrame();
+        ImGui::NewFrame();
+
+        bool show_demo_window = true;
+        ImGui::ShowDemoWindow(&show_demo_window);
+        ImGui::Begin("Hello, world!"); // Create a window called "Hello, world!" and append into it.
+
+        ImGui::Text("This is some useful text.");
+        ImGui::End();
+    }
+
+    void imgui_end_render() {
+        ImGui::EndFrame();
+        ImGui::Render();
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData());
+
+        SDL_RenderPresent(sdl_renderer); // TODO: move
     }
 
 private:
-    SDL_Window *sdlwin;
+    SDL_Window *sdl_window;
+    SDL_Renderer *sdl_renderer;
+
+    SDL_Texture *sdl_fb_texture;
+    SDL_Surface *sdl_fb_surface;
 
     unsigned int width = 640;
     unsigned int height = 480;

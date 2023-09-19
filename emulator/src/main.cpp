@@ -33,9 +33,6 @@ int main(int, char *[]) {
     cpu_ctx.mem_read_ptr = &mem_read;
     cpu_ctx.mem_write_ptr = &mem_write;
 
-    // sdl::init();
-    // fb::init();
-
     std::ifstream input("output.bin", std::ios::binary);
     if (!input.good()) {
         fprintf(stderr, "failed to read output.bin\n");
@@ -52,7 +49,10 @@ int main(int, char *[]) {
         auto t1 = std::chrono::high_resolution_clock::now();
         for (uint64_t i = 0; i < repeat_count; i++) {
 #ifdef GRAPHICS
-            running = sdl_ctx.update_events(); // TODO: seems to be broken?
+            if (!sdl_ctx.update_events()) {
+                running = false;
+                break;
+            }
             sdl_ctx.redraw();
 #endif
             uint64_t cycles_executed = cpu::execute(&cpu_ctx, instr_count);
@@ -67,7 +67,7 @@ int main(int, char *[]) {
         assert(clock_cycles >= cycles_min);
         double usage = (((double)clock_cycles - cycles_min) / (cycles_max - cycles_min)) * 100;
         printf("\nAverage CPU usage: %0.2f%% - %0.2f MIPS - %0.2fMHz - %fs runtime\n", usage, mips, freq, exectime.count());
-        break;
+        // break;
     }
 
     for (int i = 0; i < 32; i++) {

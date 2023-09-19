@@ -135,6 +135,9 @@ cmp r20, r22 // if x >= width
 pop(r22)
 ifgteq mov r20, #0
 ifgteq add r21, #1
+cmp r21, #480
+ifgteq mov r21, #0
+ifgteq mov r20, #0
 
 .drawchar_cleanup:
 pop(r7)
