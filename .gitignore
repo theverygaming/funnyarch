@@ -11,3 +11,7 @@ __pycache__/
 /verilog/output.txt
 /emulator/output.txt
 /emulator/imgui.ini
+/emulator/emu.data
+/emulator/emu.html
+/emulator/emu.js
+/emulator/emu.wasm

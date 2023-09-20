@@ -7,6 +7,11 @@ stdenv.mkDerivation {
   buildInputs = [
     SDL2
 
+    emscripten
+
     python311
   ];
+  shellHook = ''
+    EM_CACHE=~/.emscripten_cache
+  '';
 }

@@ -496,7 +496,7 @@ begin:
         // throw cpu_except(cpu_except::etype::INVALIDOPCODE);
     }
 finish:
-    if (instrs-- != 0) {
+    if (--instrs != 0) {
         goto begin;
     }
     return clock_cycles;

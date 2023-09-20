@@ -1,12 +1,22 @@
+TARGET = linux
+ifeq ($(TARGET),linux)
+# default is used for CXX
 SDL2_CONFIG = sdl2-config
-
 CXXFLAGS_FAST = -march=native -O3
-
 CXXFLAGS += -Wall -Wextra $(CXXFLAGS_FAST) `$(SDL2_CONFIG) --cflags`
-LDFLAGS += `$(SDL2_CONFIG) --libs` -lGL
-
-profile: CXXFLAGS += -pg -g -O0 -Wall -Wextra `$(SDL2_CONFIG) --cflags`
-profile: LDFLAGS += `$(SDL2_CONFIG) --libs` -pg -g -lGL
+LDFLAGS += `$(SDL2_CONFIG) --libs`
+else
+ifeq ($(TARGET),wasm)
+CXX = em++
+CXXFLAGS_FAST = -O3
+CXXFLAGS += -Wall -Wextra $(CXXFLAGS_FAST) -sUSE_SDL=2
+LDFLAGS += -s TOTAL_MEMORY=70057984 -sALLOW_MEMORY_GROWTH=1 -sUSE_SDL=2 --preload-file output.bin
+TARGET_EXTRADEPS = output.bin
+TARGET_FILE_EXTENSION = .html
+else
+$(error unknown TARGET)
+endif
+endif
 
 
 CXXFILES = src/main.cpp \
@@ -24,17 +34,15 @@ CXXFILES = src/main.cpp \
 OBJS = $(addsuffix .o, $(basename $(CXXFILES)))
 
 .PHONY: all
-all: emu
+all: emu$(TARGET_FILE_EXTENSION)
 
-emu: $(OBJS)
+emu$(TARGET_FILE_EXTENSION): $(TARGET_EXTRADEPS) $(OBJS)
 	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
 %.o: %.cpp
 	$(CXX) -o $@ -c $< $(CXXFLAGS)
 
 clean:
-	rm -f emu $(OBJS)
-
-profile: emu
-	./emu
-	gprof --line emu gmon.out > profile.txt
+	rm -f emu
+	rm -f emu.data emu.html emu.js emu.wasm
+	rm -f $(OBJS)
