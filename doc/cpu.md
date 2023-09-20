@@ -28,7 +28,7 @@
 | 23     | 31:0 | r23  |                                          |
 | 24     | 31:0 | r24  |                                          |
 | 25     | 31:0 | r25  |                                          |
-| 26     | 31:0 | r26  |                                          |
+| 26     | 31:0 | rfp  | Frame pointer                            |
 | 27     | 31:0 | iptr | Contains address to jump to on interrupt |
 | 28     | 31:0 | lr   | Link register                            |
 | 29     | 31:0 | rsp  | Stack pointer (grows downwards)          |
