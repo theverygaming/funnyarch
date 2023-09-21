@@ -120,7 +120,9 @@ int main(int argc, char **argv, char **env) {
 #ifdef TRACE
     m_trace->close();
 #endif
-    fprintf(stderr, "r10: 0x%x \n", cpu->rootp->cpu__DOT__ctrl__DOT__regarr[10]);
+    for (int i = 0; i < 32; i++) {
+        fprintf(stderr, "r%d: 0x%x \n", i, cpu->rootp->cpu__DOT__ctrl__DOT__regarr[i]);
+    }
 #ifdef GRAPHICS
     sdl.full_redraw(mem, memsize);
     while (true) {

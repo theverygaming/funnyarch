@@ -32,6 +32,10 @@ namespace mem {
         if (addr < (RAM_BASE + (RAM_BYTES - 4)) && addr >= RAM_BASE) {
             *(uint32_t *)&mem_ram[addr - RAM_BASE] = value; // TODO: endianness
         }
+        // TODO: maybe not defeat the purpose of "ROM"
+        if (addr < (ROM_BASE + (ROM_BYTES - 4)) && addr >= ROM_BASE) {
+            *(uint32_t *)&mem_rom[addr - ROM_BASE] = value; // TODO: endianness
+        }
         mmio::write(addr, value);
     }
 }
