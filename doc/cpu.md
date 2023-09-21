@@ -162,7 +162,7 @@ Assembler syntax: `cond instr tgt, src`
 | 0x02   | jmp   | [E4](#e4) | 2            | jump to address in imm23<<2                                                           |
 | 0x03   | rjmp  | [E4](#e4) | 2            | add imm23<<2 to rip (imm23 is two's complement)                                       |
 | 0x04   | mov   | [E7](#e7) | 2            | copy source register to destination register                                          |
-| 0x05   | mov   | [E3](#e3) | 2            | target=imm16 - target=(target & 0xFFFF) \| (imm16<<16) if bit 14 set                  |
+| 0x05   | mov   | [E3](#e3) | 2            | target=imm16 OR target=(target & 0xFFFF) \| (imm16<<16) if bit 14 set                 |
 | 0x06   | ldr   | [E2](#e2) | 3            | target=mem[source+imm13] (imm13 is two's complement)                                  |
 | 0x07   | ldri  | [E2](#e2) | 3            | target=mem[source] then source+=imm13 (imm13 is two's complement)                     |
 | 0x08   | str   | [E2](#e2) | 2            | mem[target+imm13]=source (imm13 is two's complement)                                  |
