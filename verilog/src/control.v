@@ -14,7 +14,8 @@ module control (
     output reg [31:0] alu_op2,
     input [31:0] alu_out,
     input alu_carry,
-    alu_zero
+    alu_zero,
+    output reg [31:0] dbg
 
     // definitions
     `define STATE_FETCH 3'h0
@@ -22,17 +23,19 @@ module control (
     `define STATE_WRITEBACK 3'h2
     `define STATE_INT_S1 3'h3
     `define STATE_INT_S2 3'h4
+    `define STATE_WAIT 3'h5
 );
   reg [31:0] instr;
-  reg [ 2:0] state;
-  reg [ 7:0] int_n;
+  reg [2:0] state;
+  reg [2:0] state_next;
+  reg [7:0] int_n;
 
   reg [31:0] regarr[31:0];
 
   always @(posedge clk) begin
     if (reset == 1) begin
       //$display("CPU: reset");
-      regarr[30] <= 32'hFFFFFFFC;
+      regarr[30] <= 32'h0;
       regarr[31] <= 32'b0;
 
       state <= `STATE_FETCH;
@@ -41,9 +44,12 @@ module control (
       //$display("CPU: fetch rip: 0x%h", {regarr[30][31:2], 2'b0});
       address = {regarr[30][31:2], 2'b0};
 
+      dbg <= regarr[24];
+
       data_rw <= 0;
-      regarr[30] <= regarr[30] + 4;
-      state <= `STATE_DECODE;
+      regarr[30] <= {regarr[30][31:2], 2'b0} + 4;
+      state <= `STATE_WAIT;
+      state_next <= `STATE_DECODE;
     end  // decode
     else if (state == `STATE_DECODE) begin
       instr = data_in;
@@ -71,7 +77,8 @@ module control (
             end
             data_rw <= 1;
             data_out <= regarr[instr[13:9]];
-            state <= `STATE_FETCH;
+            state <= `STATE_WAIT;
+            state_next <= `STATE_FETCH;
           end
           6'h02: begin  /* JMP(E4) */
             regarr[30] <= {7'b0, instr[31:9], 2'b0};
@@ -94,20 +101,23 @@ module control (
           6'h06: begin  /* LDR(E2) */
             if (instr[31] == 0) address = regarr[instr[13:9]] + {20'b0, instr[30:19]};
             else address = regarr[instr[13:9]] + {20'hfffff, instr[30:19]};
-            state <= `STATE_WRITEBACK;
+            state <= `STATE_WAIT;
+            state_next <= `STATE_WRITEBACK;
           end
           6'h07: begin  /* LDRI(E2) */
             if (instr[31] == 0) regarr[instr[13:9]] <= regarr[instr[13:9]] + {20'b0, instr[30:19]};
             else regarr[instr[13:9]] <= regarr[instr[13:9]] + {20'hfffff, instr[30:19]};
             address = regarr[instr[13:9]];
-            state <= `STATE_WRITEBACK;
+            state <= `STATE_WAIT;
+            state_next <= `STATE_WRITEBACK;
           end
           6'h08: begin  /* STR(E2) */
             if (instr[31] == 0) address = regarr[instr[18:14]] + {20'b0, instr[30:19]};
             else address = regarr[instr[18:14]] + {20'hfffff, instr[30:19]};
             data_rw <= 1;
             data_out <= regarr[instr[13:9]];
-            state <= `STATE_FETCH;
+            state <= `STATE_WAIT;
+            state_next <= `STATE_FETCH;
           end
           6'h09: begin  /* STRI(E2) */
             if (instr[31] == 0)
@@ -116,7 +126,8 @@ module control (
             address = regarr[instr[18:14]];
             data_rw <= 1;
             data_out <= regarr[instr[13:9]];
-            state <= `STATE_FETCH;
+            state <= `STATE_WAIT;
+            state_next <= `STATE_FETCH;
           end
           6'h0a: begin  /* JAL(E4) */
             regarr[28] <= regarr[30];
@@ -402,7 +413,7 @@ module control (
           state <= `STATE_FETCH;
         end
         default: begin  /* TODO: it should not be possible to reach this */
-          $display("UNREACHABLE EXECUTED!!!");
+          //$display("UNREACHABLE EXECUTED!!!");
           state <= `STATE_FETCH;
         end
       endcase
@@ -424,6 +435,10 @@ module control (
       data_rw <= 1;
       data_out <= regarr[31];
       state <= `STATE_FETCH;
+    end else if (state == `STATE_WAIT) begin
+      state <= state_next;
+    end else begin
+      state <= state + 1;
     end
   end
 endmodule

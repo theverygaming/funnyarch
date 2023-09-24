@@ -12,3 +12,6 @@
                                .byte 0 \
                                .byte 0 \
                                .byte 0
+
+#define defstr_sm(name, contents) name: \
+                               .string contents

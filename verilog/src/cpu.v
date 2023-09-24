@@ -1,9 +1,11 @@
 module cpu (
     input clk,
     reset,
-    inout [31:0] data,
+    input [31:0] data_in,
+    output [31:0] data_out,
     output data_rw,  // write if 1
-    output [31:0] address
+    output [31:0] address,
+    output [31:0] dbg
 );
   wire [3:0] alu_opcode;
   wire [31:0] alu_in1, alu_in2, alu_out;
@@ -12,8 +14,8 @@ module cpu (
   control ctrl (
       clk,
       reset,
-      data,
-      data,
+      data_in,
+      data_out,
       data_rw,
       address,
       alu_opcode,
@@ -21,7 +23,8 @@ module cpu (
       alu_in2,
       alu_out,
       alu_carry,
-      alu_zero
+      alu_zero,
+      dbg
   );
   alu alu (
       alu_opcode,
