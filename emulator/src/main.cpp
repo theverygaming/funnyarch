@@ -202,8 +202,8 @@ static inline void main_loop() {
 
 #ifdef SDLCLASS_USE_IMGUI
     if (!debugger_enabled) {
-        double cycles_min = ((double)instr_count * 2);
-        double cycles_max = ((double)instr_count * 3);
+        double cycles_min = ((double)instr_count * 3);
+        double cycles_max = ((double)instr_count * 5);
         double usage = (((double)clock_cycles - cycles_min) / (cycles_max - cycles_min)) * 100;
         cpu_usage_buf.add_val(usage);
     }

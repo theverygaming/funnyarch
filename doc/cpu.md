@@ -41,7 +41,8 @@
 | ----- | ---------------- |
 | 0     | carry flag       |
 | 1     | zero flag        |
-| 23:2  | reserved         |
+| 2     | alignment        |
+| 23:3  | reserved         |
 | 31:24 | interrupt number |
 
 ## Interrupts / Exceptions
@@ -154,55 +155,55 @@ Assembler syntax: `cond instr tgt, src`
 
 ## instructions
 
-| opcode | name  | encoding  | clock cycles | operation                                                                             |
-| ------ | ----- | --------- | ------------ | ------------------------------------------------------------------------------------- |
-| 0x00   | nop   | [E6](#e6) | 2            | no operation                                                                          |
-|        |       |           |              |                                                                                       |
-| 0x01   | strpi | [E2](#e2) | 2            | target+=imm13 then mem[target]=source (imm13 is two's complement)                     |
-| 0x02   | jmp   | [E4](#e4) | 2            | jump to address in imm23<<2                                                           |
-| 0x03   | rjmp  | [E4](#e4) | 2            | add imm23<<2 to rip (imm23 is two's complement)                                       |
-| 0x04   | mov   | [E7](#e7) | 2            | copy source register to destination register                                          |
-| 0x05   | mov   | [E3](#e3) | 2            | target=imm16 OR target=(target & 0xFFFF) \| (imm16<<16) if bit 14 set                 |
-| 0x06   | ldr   | [E2](#e2) | 3            | target=mem[source+imm13] (imm13 is two's complement)                                  |
-| 0x07   | ldri  | [E2](#e2) | 3            | target=mem[source] then source+=imm13 (imm13 is two's complement)                     |
-| 0x08   | str   | [E2](#e2) | 2            | mem[target+imm13]=source (imm13 is two's complement)                                  |
-| 0x09   | stri  | [E2](#e2) | 2            | mem[target]=source then target+=imm13 (imm13 is two's complement)                     |
-| 0x0a   | jal   | [E4](#e4) | 2            | jump to address in imm23<<2 and store pointer to next instr in lr                     |
-| 0x0b   | rjal  | [E4](#e4) | 2            | add imm23<<2 to rip (imm23 is two's complement) and store pointer to next instr in lr |
-| 0x0c   | cmp   | [E7](#e7) | 3            | perform operation target-source and update flags accordingly                          |
-| 0x0d   | cmp   | [E3](#e3) | 3            | perform operation target-imm16 and update flags accordingly                           |
-| 0x0e   | int   | [E4](#e4) | 2 (+2)       | software interrupt                                                                    |
-|        |       |           |              |                                                                                       |
-| 0x10   | add   | [E1](#e1) | 3            | target = source1 + source2                                                            |
-| 0x11   | add   | [E2](#e2) | 3            | target = source + imm13                                                               |
-| 0x12   | add   | [E3](#e3) | 3            | target = target + imm16 OR target = target + (imm16<<16) if bit 14 set                |
-|        |       |           |              |                                                                                       |
-| 0x13   | sub   | [E1](#e1) | 3            | target = source1 - source2                                                            |
-| 0x14   | sub   | [E2](#e2) | 3            | target = source - imm13                                                               |
-| 0x15   | sub   | [E3](#e3) | 3            | target = target - imm16 OR target = target - (imm16 << 16) if bit 14 set              |
-|        |       |           |              |                                                                                       |
-| 0x16   | shl   | [E1](#e1) | 3            | target = source1 << source2                                                           |
-| 0x17   | shl   | [E2](#e2) | 3            | target = source << imm13                                                              |
-|        |       |           |              |                                                                                       |
-| 0x18   | shr   | [E1](#e1) | 3            | target = source1 >> source2                                                           |
-| 0x19   | shr   | [E2](#e2) | 3            | target = source >> imm13                                                              |
-|        |       |           |              |                                                                                       |
-| 0x1A   | sar   | [E1](#e1) | 3            | target = source1 >>> source2                                                          |
-| 0x1B   | sar   | [E2](#e2) | 3            | target = source >>> imm13                                                             |
-|        |       |           |              |                                                                                       |
-| 0x1C   | and   | [E1](#e1) | 3            | target = source1 & source2                                                            |
-| 0x1D   | and   | [E2](#e2) | 3            | target = source & imm13                                                               |
-| 0x1E   | and   | [E3](#e3) | 3            | target = target & imm16 OR target = target & (imm16 << 16) if bit 14 set              |
-|        |       |           |              |                                                                                       |
-| 0x1F   | or    | [E1](#e1) | 3            | target = source1 \| source2                                                           |
-| 0x20   | or    | [E2](#e2) | 3            | target = source \| imm13                                                              |
-| 0x21   | or    | [E3](#e3) | 3            | target = target \| imm16 OR target = target \| (imm16 << 16) if bit 14 set            |
-|        |       |           |              |                                                                                       |
-| 0x22   | xor   | [E1](#e1) | 3            | target = source1 ^ source2                                                            |
-| 0x23   | xor   | [E2](#e2) | 3            | target = source ^ imm13                                                               |
-| 0x24   | xor   | [E3](#e3) | 3            | target = target ^ imm16 OR target = target ^ (imm16 << 16) if bit 14 set              |
-|        |       |           |              |                                                                                       |
-| 0x25   | not   | [E7](#e7) | 3            | target = ~source                                                                      |
+| opcode | name  | encoding  | clock cycles | operation                                                                             | exceptions |
+| ------ | ----- | --------- | ------------ | ------------------------------------------------------------------------------------- | ---------- |
+| 0x00   | nop   | [E6](#e6) | 3            | no operation                                                                          |            |
+|        |       |           |              |                                                                                       |            |
+| 0x01   | strpi | [E2](#e2) | 4            | target+=imm13 then mem[target]=source (imm13 is two's complement)                     | alignment  |
+| 0x02   | jmp   | [E4](#e4) | 3            | jump to address in imm23<<2                                                           |            |
+| 0x03   | rjmp  | [E4](#e4) | 3            | add imm23<<2 to rip (imm23 is two's complement)                                       |            |
+| 0x04   | mov   | [E7](#e7) | 3            | copy source register to destination register                                          |            |
+| 0x05   | mov   | [E3](#e3) | 3            | target=imm16 OR target=(target & 0xFFFF) \| (imm16<<16) if bit 14 set                 |            |
+| 0x06   | ldr   | [E2](#e2) | 5            | target=mem[source+imm13] (imm13 is two's complement)                                  | alignment  |
+| 0x07   | ldri  | [E2](#e2) | 5            | target=mem[source] then source+=imm13 (imm13 is two's complement)                     | alignment  |
+| 0x08   | str   | [E2](#e2) | 4            | mem[target+imm13]=source (imm13 is two's complement)                                  | alignment  |
+| 0x09   | stri  | [E2](#e2) | 4            | mem[target]=source then target+=imm13 (imm13 is two's complement)                     | alignment  |
+| 0x0a   | jal   | [E4](#e4) | 3            | jump to address in imm23<<2 and store pointer to next instr in lr                     |            |
+| 0x0b   | rjal  | [E4](#e4) | 3            | add imm23<<2 to rip (imm23 is two's complement) and store pointer to next instr in lr |            |
+| 0x0c   | cmp   | [E7](#e7) | 4            | perform operation target-source and update flags accordingly                          |            |
+| 0x0d   | cmp   | [E3](#e3) | 4            | perform operation target-imm16 and update flags accordingly                           |            |
+| 0x0e   | int   | [E4](#e4) | 3 (+4)       | software interrupt                                                                    |            |
+|        |       |           |              |                                                                                       |            |
+| 0x10   | add   | [E1](#e1) | 4            | target = source1 + source2                                                            |            |
+| 0x11   | add   | [E2](#e2) | 4            | target = source + imm13                                                               |            |
+| 0x12   | add   | [E3](#e3) | 4            | target = target + imm16 OR target = target + (imm16<<16) if bit 14 set                |            |
+|        |       |           |              |                                                                                       |            |
+| 0x13   | sub   | [E1](#e1) | 4            | target = source1 - source2                                                            |            |
+| 0x14   | sub   | [E2](#e2) | 4            | target = source - imm13                                                               |            |
+| 0x15   | sub   | [E3](#e3) | 4            | target = target - imm16 OR target = target - (imm16 << 16) if bit 14 set              |            |
+|        |       |           |              |                                                                                       |            |
+| 0x16   | shl   | [E1](#e1) | 4            | target = source1 << source2                                                           |            |
+| 0x17   | shl   | [E2](#e2) | 4            | target = source << imm13                                                              |            |
+|        |       |           |              |                                                                                       |            |
+| 0x18   | shr   | [E1](#e1) | 4            | target = source1 >> source2                                                           |            |
+| 0x19   | shr   | [E2](#e2) | 4            | target = source >> imm13                                                              |            |
+|        |       |           |              |                                                                                       |            |
+| 0x1A   | sar   | [E1](#e1) | 4            | target = source1 >>> source2                                                          |            |
+| 0x1B   | sar   | [E2](#e2) | 4            | target = source >>> imm13                                                             |            |
+|        |       |           |              |                                                                                       |            |
+| 0x1C   | and   | [E1](#e1) | 4            | target = source1 & source2                                                            |            |
+| 0x1D   | and   | [E2](#e2) | 4            | target = source & imm13                                                               |            |
+| 0x1E   | and   | [E3](#e3) | 4            | target = target & imm16 OR target = target & (imm16 << 16) if bit 14 set              |            |
+|        |       |           |              |                                                                                       |            |
+| 0x1F   | or    | [E1](#e1) | 4            | target = source1 \| source2                                                           |            |
+| 0x20   | or    | [E2](#e2) | 4            | target = source \| imm13                                                              |            |
+| 0x21   | or    | [E3](#e3) | 4            | target = target \| imm16 OR target = target \| (imm16 << 16) if bit 14 set            |            |
+|        |       |           |              |                                                                                       |            |
+| 0x22   | xor   | [E1](#e1) | 4            | target = source1 ^ source2                                                            |            |
+| 0x23   | xor   | [E2](#e2) | 4            | target = source ^ imm13                                                               |            |
+| 0x24   | xor   | [E3](#e3) | 4            | target = target ^ imm16 OR target = target ^ (imm16 << 16) if bit 14 set              |            |
+|        |       |           |              |                                                                                       |            |
+| 0x25   | not   | [E7](#e7) | 4            | target = ~source                                                                      |            |
 
 <!-- TODO: fix this  -->
 

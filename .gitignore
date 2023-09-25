@@ -6,9 +6,11 @@
 
 /emulator/emu
 /verilog/obj_dir
+/verilog/out
 __pycache__/
 
 /verilog/output.txt
+/verilog/emulator
 /emulator/output.txt
 /emulator/imgui.ini
 /emulator/emu.data
