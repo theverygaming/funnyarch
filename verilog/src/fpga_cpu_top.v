@@ -8,6 +8,9 @@ module fpga_cpu_top (
   wire [31:0] data_out;
   wire write;
   wire clk;
+  wire [31:0] ram_data_in;
+  wire [31:0] rom_data_in;
+
 
   clkdiv clkdiv (
       clk_12m,
@@ -24,10 +27,48 @@ module fpga_cpu_top (
       dbg
   );
 
+  assign data_in = address[12] == 1 ? ram_data_in : rom_data_in;
+
+  ram ram1 (
+      clk,
+      address[7:0],
+      data_out[7:0],
+      ram_data_in[7:0],
+      write,
+      address[12] == 1
+  );
+
+  ram ram2 (
+      clk,
+      address[7:0] + 8'h1,
+      data_out[15:8],
+      ram_data_in[15:8],
+      write,
+      address[12] == 1
+  );
+
+  ram ram3 (
+      clk,
+      address[7:0] + 8'h2,
+      data_out[23:16],
+      ram_data_in[23:16],
+      write,
+      address[12] == 1
+  );
+
+  ram ram4 (
+      clk,
+      address[7:0] + 8'h3,
+      data_out[31:24],
+      ram_data_in[31:24],
+      write,
+      address[12] == 1
+  );
+
   rom rom (
       clk,
       address[6:0],
-      data_in,
+      rom_data_in,
       address[12] == 0 && write == 0
   );
 
@@ -51,25 +92,23 @@ endmodule
 
 module ram (
     input clk,
-    input [4:0] address,
-    input [31:0] data_in,
-    output reg [31:0] data_out,
+    input [7:0] address,
+    input [7:0] data_in,
+    output reg [7:0] data_out,
     input write,
     cs
 );
-  reg [7:0] mem[20];
+  reg [7:0] mem[1024];
+
+  initial mem[0] <= 32'h0;
 
   always @(posedge clk) begin
-    mem[8] <= 8'h03;
-    if (write && cs) begin
-      mem[address]   <= data_in[7:0];
-      mem[address+1] <= data_in[15:8];
-      mem[address+2] <= data_in[23:16];
-      mem[address+3] <= data_in[31:24];
+    if ((write == 0) && cs) begin
+      data_out <= mem[address];
     end
 
-    if ((write == 0) && cs) begin
-      data_out <= {mem[address+3], mem[address+2], mem[address+1], mem[address]};
+    if (write && cs) begin
+      mem[address] <= data_in;
     end
   end
 endmodule
@@ -83,7 +122,7 @@ module rom (
 );
   reg [7:0] mem[77];
 
-  always @(posedge clk) begin
+  initial begin
     mem[0]  = 8'h5;
     mem[1]  = 8'h0;
     mem[2]  = 8'h40;
@@ -161,7 +200,9 @@ module rom (
     mem[74] = 8'h68;
     mem[75] = 8'h65;
     mem[76] = 8'h0;
+  end
 
+  always @(posedge clk) begin
     if (cs) begin
       data_out <= {mem[address+3], mem[address+2], mem[address+1], mem[address]};
     end

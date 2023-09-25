@@ -11,6 +11,9 @@ __pycache__/
 
 /verilog/output.txt
 /verilog/emulator
+/verilog/icebreaker.asc
+/verilog/icebreaker.json
+/verilog/icebreaker.log
 /emulator/output.txt
 /emulator/imgui.ini
 /emulator/emu.data
