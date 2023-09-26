@@ -6,9 +6,16 @@
 
 /emulator/emu
 /verilog/obj_dir
+/verilog/out
 __pycache__/
 
+/verilog/src/hex_memory_file.mem
 /verilog/output.txt
+/verilog/emulator
+/verilog/emulator_fpga
+/verilog/icebreaker.asc
+/verilog/icebreaker.json
+/verilog/icebreaker.log
 /emulator/output.txt
 /emulator/imgui.ini
 /emulator/emu.data

@@ -1,7 +1,8 @@
 module cpu (
     input clk,
     reset,
-    inout [31:0] data,
+    input [31:0] data_in,
+    output [31:0] data_out,
     output data_rw,  // write if 1
     output [31:0] address
 );
@@ -12,8 +13,8 @@ module cpu (
   control ctrl (
       clk,
       reset,
-      data,
-      data,
+      data_in,
+      data_out,
       data_rw,
       address,
       alu_opcode,

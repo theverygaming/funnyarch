@@ -13,9 +13,9 @@ module alu (
     case (opcode)
       4'h1: tmp = {1'b0, in1} + {1'b0, in2};  /* add */
       4'h2: tmp = {1'b0, in1} - {1'b0, in2};  /* sub */
-      4'h3: tmp = {1'b0, in1} << {1'b0, in2};  /* shl (logical) */
-      4'h4: tmp = {1'b0, in1} >> {1'b0, in2};  /* shr (logical) */
-      4'h5: tmp = {1'b0, in1s >>> in2s};  /* sar (arithmetic) */
+      4'h3: tmp = {1'b0, in1} << {1'b0, in2[4:0]};  /* shl (logical) */
+      4'h4: tmp = {1'b0, in1} >> {1'b0, in2[4:0]};  /* shr (logical) */
+      4'h5: tmp = {1'b0, in1s >>> in2s[4:0]};  /* sar (arithmetic) */
       4'h6: tmp = {1'b0, in1} & {1'b0, in2};  /* and */
       4'h7: tmp = {1'b0, in1} | {1'b0, in2};  /* or */
       4'h8: tmp = {1'b0, in1} ^ {1'b0, in2};  /* xor */

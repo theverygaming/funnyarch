@@ -9,6 +9,7 @@ rjmp main
 #include "interrupt.asm"
 
 main:
+or rf, #0b100 // set alignment flag
 mov rsp, #0x23E0
 mov iptr, int_handler
 int #0 // FIXME: we need a proper test for interrupts (and exceptions)

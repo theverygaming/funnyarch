@@ -474,6 +474,7 @@ def parse_assembler_label(match):
     label = match.group("label")
     if any(x for x in symbols if x.symname == label):
         raise Exception(f"double symbol {label}")
+    align_outfile(4) # FIXME: this alignment stuff is SUPER broken!!!
     symbols.append(Symbol(label, outfile.tell()))
     print(f'label "{label}" at {outfile.tell()}')
 

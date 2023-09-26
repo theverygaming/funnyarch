@@ -7,7 +7,10 @@ stdenv.mkDerivation {
   buildInputs = [
     verilator
     gtkwave
+
     yosys
+    icestorm
+    nextpnr
 
     SDL2
 

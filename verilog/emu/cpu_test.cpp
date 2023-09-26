@@ -3,10 +3,10 @@
 #include "sdl_class.h"
 #include <chrono>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <stdlib.h>
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
@@ -55,31 +55,31 @@ int main(int argc, char **argv, char **env) {
 
             if (cpu->data_rw == 1) {
 #ifdef TRACE
-                fprintf(stderr, "mem write A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
+                fprintf(stderr, "mem write A: 0x%x D: 0x%x\n", cpu->address, cpu->data_out);
 #endif
                 if (cpu->address >= memsize - 4) {
                     break;
                 }
-                *(uint32_t *)&mem[cpu->address] = cpu->data; // TODO: endianness
+                *(uint32_t *)&mem[cpu->address] = cpu->data_out; // TODO: endianness
                 if (cpu->address == 0x1000) {
                     outf.write((const char *)&mem[cpu->address], 1);
                     printf("%c", mem[cpu->address]);
                     fprintf(stderr, "OUTPUT CHAR: %c\n", mem[cpu->address]);
                 }
 #ifdef GRAPHICS
-                sdl.mem_write(cpu->address, cpu->data);
+                sdl.mem_write(cpu->address, cpu->data_out);
 #endif
             } else {
                 if (cpu->address == 0xFFFFFFFC) {
-                    cpu->data = 0x02; // JMP(E4) #0
+                    cpu->data_in = 0x02; // JMP(E4) #0
                 } else {
                     if (cpu->address >= memsize - 4) {
                         break;
                     }
-                    cpu->data = *(uint32_t *)&mem[cpu->address]; // TODO: endianness
+                    cpu->data_in = *(uint32_t *)&mem[cpu->address]; // TODO: endianness
                 }
 #ifdef TRACE
-                fprintf(stderr, "mem read A: 0x%x D: 0x%x\n", cpu->address, cpu->data);
+                fprintf(stderr, "mem read A: 0x%x D: 0x%x\n", cpu->address, cpu->data_in);
 #endif
             }
         }
