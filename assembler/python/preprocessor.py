@@ -55,7 +55,7 @@ def resolvemacros(str, macros_c):
         lines.append(line)
 
     for macro in macros_s:
-        rg_macargs = r"(#define ([A-Za-z0-9._]*)\((([A-Za-z0-9]*(, )?)*)\) )(.*)"
+        rg_macargs = r"(#define ([A-Za-z0-9._]*)\((([A-Za-z0-9_]*(, )?)*)\) )(.*)"
         rg_macnoargs = r"(#define ([A-Za-z0-9._]*) )(.*)"
         if re.match(rg_macargs, macro, flags=re.DOTALL):
             content = re.sub(rg_macargs, r"\6", macro, flags=re.DOTALL)

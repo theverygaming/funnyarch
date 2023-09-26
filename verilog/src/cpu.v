@@ -4,8 +4,7 @@ module cpu (
     input [31:0] data_in,
     output [31:0] data_out,
     output data_rw,  // write if 1
-    output [31:0] address,
-    output [31:0] dbg
+    output [31:0] address
 );
   wire [3:0] alu_opcode;
   wire [31:0] alu_in1, alu_in2, alu_out;
@@ -23,8 +22,7 @@ module cpu (
       alu_in2,
       alu_out,
       alu_carry,
-      alu_zero,
-      dbg
+      alu_zero
   );
   alu alu (
       alu_opcode,

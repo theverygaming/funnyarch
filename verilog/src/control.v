@@ -14,8 +14,7 @@ module control (
     output reg [31:0] alu_op2,
     input [31:0] alu_out,
     input alu_carry,
-    alu_zero,
-    output reg [31:0] dbg
+    alu_zero
 
     // definitions
     `define STATE_FETCH 3'h0
@@ -37,7 +36,7 @@ module control (
   always @(posedge clk) begin
     if (reset == 1) begin
       //$display("CPU: reset");
-      regarr[30] <= `INITIAL_RSP;
+      regarr[30] <= `INITIAL_RIP;
       regarr[31] <= 32'b0;
 
       state <= `STATE_FETCH;
@@ -45,9 +44,6 @@ module control (
     else if (state == `STATE_FETCH) begin
       //$display("CPU: fetch rip: 0x%h", {regarr[30][31:2], 2'b0});
       address = {regarr[30][31:2], 2'b0};
-
-      dbg <= regarr[24];
-
       data_rw <= 0;
       regarr[30] <= {regarr[30][31:2], 2'b0} + 4;
       state <= `STATE_WAIT;

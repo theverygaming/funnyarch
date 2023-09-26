@@ -1,7 +1,7 @@
 .NOTPARALLEL:
 
 .PHONY: all
-all: test emulator
+all: test emulator emulator_fpga
 
 .PHONY: clean
 clean:
@@ -23,9 +23,15 @@ out/testbench_%: tests/testbench_%.cpp src/%.v
 	cp obj_dir/V$* out/testbench_$*
 
 output.bin: ../asm_tests/**
-	python3 ../assembler/python/assembler.py ../asm_tests/main.asm output.bin
+	python3 ../assembler/python/assembler.py ../asm_tests/smolhello.asm output.bin
 
 emulator: src/* emu/* output.bin
 	verilator --top-module cpu -O3 --x-assign fast --x-initial fast --noassert -cc src/*.v --exe emu/*.cpp --CFLAGS "`sdl2-config --cflags`" --LDFLAGS "`sdl2-config --libs`"
 	make -C obj_dir -f Vcpu.mk OPT_FAST="-O3 -march=native"
 	cp obj_dir/Vcpu emulator
+
+emulator_fpga: src/* emu_fpga/* output.bin
+	python3 bin2h.py > src/hex_memory_file.mem
+	verilator -Isrc/ --top-module fpga_cpu_top -O3 --x-assign fast --x-initial fast --noassert -cc src/*.v --exe emu_fpga/*.cpp --CFLAGS "`sdl2-config --cflags`" --LDFLAGS "`sdl2-config --libs`"
+	make -C obj_dir -f Vfpga_cpu_top.mk OPT_FAST="-O3 -march=native"
+	cp obj_dir/Vfpga_cpu_top emulator_fpga
