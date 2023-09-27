@@ -7,7 +7,9 @@ all: test emulator emulator_fpga
 clean:
 	rm -rf out/
 	rm -rf obj_dir/
-	rm -f emulator output.bin
+	rm -f emulator emulator_fpga output.bin output.txt
+	rm -f icebreaker.asc icebreaker.bin icebreaker.json icebreaker.log
+	rm -f hex_memory_file.mem src/hex_memory_file.mem
 
 .PHONY: test
 test: out/testbench_alu out/testbench_cpu
@@ -31,7 +33,16 @@ emulator: src/* emu/* output.bin
 	cp obj_dir/Vcpu emulator
 
 emulator_fpga: src/* emu_fpga/* output.bin
-	python3 bin2h.py > src/hex_memory_file.mem
+	python3 bin2h.py > hex_memory_file.mem
 	verilator -Isrc/ --top-module fpga_cpu_top -O3 --x-assign fast --x-initial fast --noassert -cc src/*.v --exe emu_fpga/*.cpp --CFLAGS "`sdl2-config --cflags`" --LDFLAGS "`sdl2-config --libs`"
 	make -C obj_dir -f Vfpga_cpu_top.mk OPT_FAST="-O3 -march=native"
 	cp obj_dir/Vfpga_cpu_top emulator_fpga
+
+.PHONY: synth-icebreaker
+synth-icebreaker: icebreaker.bin
+
+icebreaker.bin: src/* output.bin
+	python3 bin2h.py > hex_memory_file.mem
+	yosys -ql icebreaker.log -p "synth_ice40 -top top -json icebreaker.json" fpga/icebreaker/icebreaker.v src/alu.v src/control.v src/cpu.v src/fpga_cpu_top.v
+	nextpnr-ice40 --up5k --package sg48 --json icebreaker.json --pcf fpga/icebreaker/icebreaker.pcf --asc icebreaker.asc
+	icepack icebreaker.asc icebreaker.bin

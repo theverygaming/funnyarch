@@ -10,6 +10,7 @@
 __pycache__/
 
 /verilog/src/hex_memory_file.mem
+/verilog/hex_memory_file.mem
 /verilog/output.txt
 /verilog/emulator
 /verilog/emulator_fpga
