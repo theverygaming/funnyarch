@@ -72,7 +72,7 @@ module ram (
   reg [31:0] mem[1024];
 
   initial begin
-    $readmemh("/home/user/Downloads/funnyarch/verilog/src/hex_memory_file.mem", mem);
+    $readmemh("hex_memory_file.mem", mem);
   end
 
   always @(posedge clk) begin
