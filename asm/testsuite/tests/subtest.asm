@@ -37,8 +37,13 @@ mov r2, #0
 sub r2, #0
 cmp r2, #0
 ifneq rjmp .subtest_failed
+
+mov r2, #0
+sub r2, #1
+subh r2, #0xFFFF
+cmp r2, #0xFFFF
+ifneq rjmp .subtest_failed
 ifeq rjmp .subtest_finish
-// TODO: high 16 bits
 
 .subtest_failed:
 mov r1, #1
@@ -46,6 +51,6 @@ mov r1, #1
 mov r0, subtest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(subtest_str, "SUB")

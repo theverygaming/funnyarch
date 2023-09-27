@@ -60,6 +60,6 @@ mov r1, #1
 mov r0, shifttest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(shifttest_str, "shift")

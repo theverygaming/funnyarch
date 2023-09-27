@@ -20,7 +20,7 @@ pop(r2)
 pop(r1)
 pop(r0)
 pop(lr)
-ret()
+ret
 
 defstr(teststr, "TEST '")
 defstr(teststr_ok, "' [OK]")

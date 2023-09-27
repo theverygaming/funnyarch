@@ -47,6 +47,6 @@ mov r1, #1
 mov r0, jumptest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(jumptest_str, "jump")

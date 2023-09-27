@@ -22,7 +22,7 @@ rjmp loop
 // pointer to string in r0
 puts:
 .puts_loop:
-load_byte_unaligned(r0, r1)
+load_byte_unaligned(r0, r1, r3)
 add r0, #1
 cmp r1, #0
 ifeq rjmp .puts_finish
@@ -30,7 +30,7 @@ mov r24, #0
 str r24, r1, #0
 rjmp .puts_loop
 .puts_finish:
-ret()
+ret
 
 defstr_sm(str_hello, "hello")
 defstr_sm(str_hehe, "hehe")

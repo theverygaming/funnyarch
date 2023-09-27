@@ -7,6 +7,7 @@
 #include "tests/ortest.asm"
 #include "tests/xortest.asm"
 #include "tests/nottest.asm"
+#include "tests/movtest.asm"
 
 alltests:
 push(lr)
@@ -19,5 +20,6 @@ rcall(andtest)
 rcall(ortest)
 rcall(xortest)
 rcall(nottest)
+rcall(movtest)
 pop(lr)
-ret()
+ret

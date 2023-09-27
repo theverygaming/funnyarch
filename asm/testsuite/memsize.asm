@@ -18,5 +18,5 @@ ifeq add total_mem_bytes, #4
 stri current_addr, saved_data, #4 // restore old data
 cmp current_addr, end_addr
 iflt rjmp .memsize_loop
-ret()
+ret
 .regaliasclear

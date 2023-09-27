@@ -4,10 +4,12 @@ push(lr)
 push(r0)
 push(r2)
 push(r3)
+push(r4)
+
 mov r2, #0x1000
 .puts_loop:
-ldri r3, r0, #1
-and r3, #0xFF
+load_byte_unaligned(r0, r3, r4)
+add r0, #1
 cmp r3, #0
 ifeq rjmp .puts_finish
 push(r0)
@@ -24,8 +26,10 @@ push(r0)
 ifnz mov r0, r3
 ifnz rjal drawchar
 pop(r0)
+
+pop(r4)
 pop(r3)
 pop(r2)
 pop(r0)
 pop(lr)
-ret()
+ret

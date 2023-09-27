@@ -55,7 +55,15 @@ class OperandType(Enum):
 
 
 class Instruction:
-    def __init__(self, type, opcode, operands=None, relsymimm=False, divsymimm=False):
+    def __init__(
+        self,
+        type,
+        opcode,
+        operands=None,
+        relsymimm=False,
+        divsymimm=False,
+        instrspecific=0,
+    ):
         self.type = type  # instruction encoding type
         self.opcode = opcode
         self.operands = operands  # instruction operand types as array
@@ -63,6 +71,7 @@ class Instruction:
         self.divsymimm = divsymimm  # if label immediate should be divided by 4
         if self.operands is None:
             self.operands = get_op_types(self.type)
+        self.instrspecific = instrspecific
 
 
 def get_op_types(instrtype):
@@ -93,6 +102,9 @@ instructions = {
         Instruction(InstructionType.E7, 0x04),
         Instruction(InstructionType.E3, 0x05),
     ],
+    "movh": [
+        Instruction(InstructionType.E3, 0x05, instrspecific=1),
+    ],
     "ldr": [Instruction(InstructionType.E2, 0x06)],
     "ldri": [Instruction(InstructionType.E2, 0x07)],
     "str": [Instruction(InstructionType.E2, 0x08)],
@@ -116,10 +128,16 @@ instructions = {
         Instruction(InstructionType.E2, 0x11),
         Instruction(InstructionType.E3, 0x12),
     ],
+    "addh": [
+        Instruction(InstructionType.E3, 0x12, instrspecific=1),
+    ],
     "sub": [
         Instruction(InstructionType.E1, 0x13),
         Instruction(InstructionType.E2, 0x14),
         Instruction(InstructionType.E3, 0x15),
+    ],
+    "subh": [
+        Instruction(InstructionType.E3, 0x15, instrspecific=1),
     ],
     "shl": [
         Instruction(InstructionType.E1, 0x16),
@@ -138,15 +156,24 @@ instructions = {
         Instruction(InstructionType.E2, 0x1D),
         Instruction(InstructionType.E3, 0x1E),
     ],
+    "andh": [
+        Instruction(InstructionType.E3, 0x1E, instrspecific=1),
+    ],
     "or": [
         Instruction(InstructionType.E1, 0x1F),
         Instruction(InstructionType.E2, 0x20),
         Instruction(InstructionType.E3, 0x21),
     ],
+    "orh": [
+        Instruction(InstructionType.E3, 0x21, instrspecific=1),
+    ],
     "xor": [
         Instruction(InstructionType.E1, 0x22),
         Instruction(InstructionType.E2, 0x23),
         Instruction(InstructionType.E3, 0x24),
+    ],
+    "xorh": [
+        Instruction(InstructionType.E3, 0x24, instrspecific=1),
     ],
     "not": [
         Instruction(InstructionType.E7, 0x25),
@@ -442,7 +469,9 @@ def assemble_instr(match):
                 )
             )
 
-    instr_assembled = AssembledInstr(instinfo.type, instinfo.opcode, cond, args, 0)
+    instr_assembled = AssembledInstr(
+        instinfo.type, instinfo.opcode, cond, args, instinfo.instrspecific
+    )
     write_instr(instr_assembled)
 
 
@@ -474,7 +503,7 @@ def parse_assembler_label(match):
     label = match.group("label")
     if any(x for x in symbols if x.symname == label):
         raise Exception(f"double symbol {label}")
-    align_outfile(4) # FIXME: this alignment stuff is SUPER broken!!!
+    align_outfile(4)  # FIXME: this alignment stuff is SUPER broken!!!
     symbols.append(Symbol(label, outfile.tell()))
     print(f'label "{label}" at {outfile.tell()}')
 
@@ -482,9 +511,7 @@ def parse_assembler_label(match):
 rg_arg = r"[A-Za-z0-9#\-_.]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
-rg_directive = (
-    r"^\.(export|extern|string|ascii|byte|origin|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"
-)
+rg_directive = r"^\.(export|extern|string|ascii|byte|origin|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 
 

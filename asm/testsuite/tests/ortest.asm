@@ -24,7 +24,14 @@ mov r2, #0x7866
 or r2, #0x656F
 cmp r2, #0x7d6f
 ifneq rjmp .ortest_failed
-// TODO: high 16 bits
+
+mov r2, #0x15
+movh r2, #0xF572
+orh r2, #0xa8d
+mov r3, #0x15
+movh r3, #0xFFFF
+cmp r2, r3
+ifneq rjmp .ortest_failed
 
 rjmp .ortest_finish
 
@@ -34,6 +41,6 @@ mov r1, #1
 mov r0, ortest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(ortest_str, "OR")

@@ -24,8 +24,8 @@ out/testbench_%: tests/testbench_%.cpp src/%.v
 	mkdir -p out
 	cp obj_dir/V$* out/testbench_$*
 
-output.bin: ../asm_tests/**
-	python3 ../assembler/python/assembler.py ../asm_tests/smolhello.asm output.bin
+output.bin: ../asm/testsuite/**
+	python3 ../assembler/python/assembler.py ../asm/testsuite/main.asm output.bin
 
 emulator: src/* emu/* output.bin
 	verilator --top-module cpu -O3 --x-assign fast --x-initial fast --noassert -cc src/*.v --exe emu/*.cpp --CFLAGS "`sdl2-config --cflags`" --LDFLAGS "`sdl2-config --libs`"

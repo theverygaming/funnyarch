@@ -26,8 +26,14 @@ cmp r2, #0x73
 ifeq rjmp .andtest_failed
 cmp r2, #0x6066
 ifneq rjmp .andtest_failed
-// TODO: high 16 bits
 
+mov r2, #0x15
+movh r2, #0xF572
+andh r2, #0xFFFF
+mov r3, #0x0
+movh r3, #0xF572
+cmp r2, r3
+ifneq rjmp .andtest_failed
 
 mov r2, #0
 and r1, r1, r2
@@ -39,6 +45,6 @@ mov r1, #1
 mov r0, andtest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(andtest_str, "AND")

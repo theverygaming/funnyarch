@@ -24,7 +24,14 @@ mov r2, #0x7866
 xor r2, #0x656F
 cmp r2, #0x1d09
 ifneq rjmp .xortest_failed
-// TODO: high 16 bits
+
+mov r2, #0xF806
+movh r2, #0x6F19
+xorh r2, #0x1A6F
+mov r3, #0xF806
+movh r3, #0x7576
+cmp r2, r3
+ifneq rjmp .xortest_failed
 
 xor r1, r1, r1
 rjmp .xortest_finish
@@ -35,6 +42,6 @@ mov r1, #1
 mov r0, xortest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(xortest_str, "XOR")

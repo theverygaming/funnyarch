@@ -32,11 +32,18 @@ mov r2, #7839
 add r2, #1
 cmp r2, #7840
 ifneq rjmp .addtest_failed
-// TODO: high 16 bits
 
 mov r2, #0
 add r2, #0
 cmp r2, #0
+ifneq rjmp .addtest_failed
+
+mov r2, #0
+add r2, #0xFFFF
+addh r2, #0xFFFF
+mov r3, #0
+sub r3, #1
+cmp r2, r3
 ifneq rjmp .addtest_failed
 ifeq rjmp .addtest_finish
 
@@ -46,6 +53,6 @@ mov r1, #1
 mov r0, addtest_str
 rcall(testresult)
 pop(lr)
-ret()
+ret
 
 defstr(addtest_str, "ADD")

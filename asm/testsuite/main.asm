@@ -43,7 +43,7 @@ ifneq rjmp .mult_l1
 mov r0, r2
 pop(r2)
 pop(r1)
-ret()
+ret
 
 
 #include "font8x8.asm"
@@ -150,4 +150,4 @@ pop(r2)
 pop(r1)
 pop(r0)
 pop(lr)
-ret()
+ret
