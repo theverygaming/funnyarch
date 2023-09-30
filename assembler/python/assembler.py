@@ -350,6 +350,8 @@ def relocate():
             relocval = int(relocval / 4)  # depends on instruction..
             print("reloc div")
         print(f"reloc sym: {reloc.symname} val: {relocval}")
+        if relocval > pow(2, reloc.bits):
+            raise Exception(f"relocation does not fit")
         oldpos = outfile.tell()
         outfile.seek(reloc.valueloc)
         value = read_out(4)
@@ -358,7 +360,6 @@ def relocate():
             (relocval & mask) << reloc.shift_offset
         )
         outfile.seek(reloc.valueloc)
-        # FIXME: check if value actually fits
         write_out(4, value)
         outfile.seek(oldpos)
 
