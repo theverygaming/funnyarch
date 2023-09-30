@@ -4,6 +4,8 @@
 
 *.vcd
 
+imgui.ini
+
 /emulator/emu
 /verilog/obj_dir
 /verilog/out
@@ -18,7 +20,6 @@ __pycache__/
 /verilog/icebreaker.json
 /verilog/icebreaker.log
 /emulator/output.txt
-/emulator/imgui.ini
 /emulator/emu.data
 /emulator/emu.html
 /emulator/emu.js

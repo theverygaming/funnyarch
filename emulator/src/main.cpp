@@ -84,7 +84,7 @@ static buf<size_t, 10> wait_time_buf;
 static struct cpu::ctx cpu_ctx;
 
 #ifdef SDLCLASS_USE_IMGUI
-static bool debugger_enabled = true;
+static bool debugger_enabled = false;
 static bool debugger_step = true;
 static uint64_t debugger_step_instr_count = 0;
 
