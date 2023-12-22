@@ -61,7 +61,7 @@ int main(int argc, char **argv, char **env) {
                     break;
                 }
                 *(uint32_t *)&mem[cpu->address] = cpu->data_out; // TODO: endianness
-                if (cpu->address == 0x1000) {
+                if (cpu->address == 0xF004B000) {
                     outf.write((const char *)&mem[cpu->address], 1);
                     printf("%c", mem[cpu->address]);
                     fprintf(stderr, "OUTPUT CHAR: %c\n", mem[cpu->address]);

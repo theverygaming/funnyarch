@@ -92,7 +92,8 @@ not r4, r3 // inverted mask in r4
 
 mov r1, font8x8 // font pointer
 add r1, r1, r0 // add offset to font pointer
-mov r2, #0x3000 // framebuffer pointer
+mov r2, #0x0000 // framebuffer pointer
+movh r2, #0xF000 // framebuffer pointer
 // add x and y to framebuffer pointer
 push(r20)
 push(r1)

@@ -142,10 +142,10 @@ public:
     }
 
     inline void mem_write(uint32_t _address, uint32_t value) {
-        if (_address < 0x3000) {
+        if (_address < 0xF0000000) {
             return;
         }
-        uint64_t address = _address - 0x3000;
+        uint64_t address = _address - 0xF0000000;
         unsigned int y = (address * 8) / width;
         if (y >= height) {
             return;

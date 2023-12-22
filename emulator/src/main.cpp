@@ -12,10 +12,13 @@
 
 #include "cpu.h"
 #include "mem.h"
-#define SDLCLASS_USE_IMGUI
-#include "sdl_class.h"
 
 #define GRAPHICS
+
+#ifdef GRAPHICS
+#define SDLCLASS_USE_IMGUI
+#include "sdl_class.h"
+#endif
 
 template <typename T, size_t size> class buf {
 public:
@@ -244,7 +247,7 @@ int main(int, char *[]) {
     init_emu();
 #ifdef SDLCLASS_USE_IMGUI
     sdl_ctx.set_imgui_render_func(&imgui_debug_window);
-    sdl_ctx.set_buf(mem::fb_base, FB_LEN);
+    sdl_ctx.set_buf(mem::mem_fb, FB_BYTES);
 #endif
 
     std::ifstream input("output.bin", std::ios::binary);

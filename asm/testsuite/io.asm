@@ -6,7 +6,8 @@ push(r2)
 push(r3)
 push(r4)
 
-mov r2, #0x1000
+mov r2, #0xB000
+movh r2, #0xF004
 .puts_loop:
 load_byte_unaligned(r0, r3, r4)
 add r0, #1
