@@ -9,6 +9,7 @@ Everything above 0xF0000000 is generally MMIO
 
 
 # Serial
+
 ## Data register
 Read -> RX buffer. Write -> TX buffer. High 3 bytes for status (no effect on write). Lowest byte is data
 | bits | description                                               |

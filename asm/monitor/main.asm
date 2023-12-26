@@ -6,8 +6,8 @@ rjmp main
 
 #include "macros.asm"
 
-#define LINE_BUFFER_BEGIN 0x1000
-#define LINE_BUFFER_END 0x1040
+#define LINE_BUFFER_BEGIN 0x2100
+#define LINE_BUFFER_END 0x2140
 
 // r10 = current memory location
 // r11 = next memory location
@@ -16,7 +16,7 @@ main:
 or rf, #0b100 // set alignment flag
 mov iptr, entry
 push(lr)
-mov rsp, #0x1500
+mov rsp, #0x2100
 mov r0, #0x5C // '\'
 rcall(write_serial)
 mov r0, #0x0A // newline
@@ -206,23 +206,23 @@ ret
 // reads from serial until line break
 // trashes: r0, r1, r2
 readline:
+push(lr)
 mov r2, #LINE_BUFFER_BEGIN
 _readline_loop:
 
-push(lr)
 rcall(read_serial)
-//rcall(write_serial) // FIXME: loopback serial when there is a proper serial emulator implemented
 push(r0)
 mov r1, r0
 mov r0, r2
 rcall(write_byte_unaligned)
 pop(r0)
-pop(lr)
 
 cmp r0, #0x0A // newline
+ifeq rjal write_serial
 ifeq rjmp _readline_end
 cmp r0, #0x08 // backspace
 ifeq rjmp _readline_backspace
+rcall(write_serial)
 
 add r2, #1
 cmp r2, #LINE_BUFFER_END
@@ -231,8 +231,10 @@ rjmp _readline_loop
 _readline_backspace:
 cmp r2, #LINE_BUFFER_BEGIN
 ifgt sub r2, #1
+ifgt rjal write_serial
 rjmp _readline_loop
 _readline_end:
+pop(lr)
 ret
 
 

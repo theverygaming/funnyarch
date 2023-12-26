@@ -70,14 +70,10 @@ int main(int argc, char **argv, char **env) {
                 sdl.mem_write(cpu->address, cpu->data_out);
 #endif
             } else {
-                if (cpu->address == 0xFFFFFFFC) {
-                    cpu->data_in = 0x02; // JMP(E4) #0
-                } else {
-                    if (cpu->address >= memsize - 4) {
-                        break;
-                    }
-                    cpu->data_in = *(uint32_t *)&mem[cpu->address]; // TODO: endianness
+                if (cpu->address >= memsize - 4) {
+                    break;
                 }
+                cpu->data_in = *(uint32_t *)&mem[cpu->address]; // TODO: endianness
 #ifdef TRACE
                 fprintf(stderr, "mem read A: 0x%x D: 0x%x\n", cpu->address, cpu->data_in);
 #endif

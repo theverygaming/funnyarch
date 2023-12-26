@@ -32,7 +32,6 @@ void cpu::init(struct cpu::ctx *ctx) {
 
 void cpu::reset(struct cpu::ctx *ctx) {
     memset(ctx->regs, 0, sizeof(ctx->regs));
-    ctx->regs[CPU_REG_IP] = 0xFFFFFFFC;
 }
 
 static inline CPU_FORCEINLINE uint32_t interrupt(struct cpu::ctx *ctx, uint8_t n) {

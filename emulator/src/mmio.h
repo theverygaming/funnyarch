@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 namespace mmio {
-
     inline uint32_t read(uint32_t addr) {
         if (addr == 0xF004B000) {
             char c;
