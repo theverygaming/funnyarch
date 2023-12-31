@@ -1,60 +1,79 @@
 ## Registers
 
-| number | bits | name | description                              |
-| ------ | ---- | ---- | ---------------------------------------- |
-| 0      | 31:0 | r0   |                                          |
-| 1      | 31:0 | r1   |                                          |
-| 2      | 31:0 | r2   |                                          |
-| 3      | 31:0 | r3   |                                          |
-| 4      | 31:0 | r4   |                                          |
-| 5      | 31:0 | r5   |                                          |
-| 6      | 31:0 | r6   |                                          |
-| 7      | 31:0 | r7   |                                          |
-| 8      | 31:0 | r8   |                                          |
-| 9      | 31:0 | r9   |                                          |
-| 10     | 31:0 | r10  |                                          |
-| 11     | 31:0 | r11  |                                          |
-| 12     | 31:0 | r12  |                                          |
-| 13     | 31:0 | r13  |                                          |
-| 14     | 31:0 | r14  |                                          |
-| 15     | 31:0 | r15  |                                          |
-| 16     | 31:0 | r16  |                                          |
-| 17     | 31:0 | r17  |                                          |
-| 18     | 31:0 | r18  |                                          |
-| 19     | 31:0 | r19  |                                          |
-| 20     | 31:0 | r20  |                                          |
-| 21     | 31:0 | r21  |                                          |
-| 22     | 31:0 | r22  |                                          |
-| 23     | 31:0 | r23  |                                          |
-| 24     | 31:0 | r24  |                                          |
-| 25     | 31:0 | r25  |                                          |
-| 26     | 31:0 | rfp  | Frame pointer                            |
-| 27     | 31:0 | iptr | Contains address to jump to on interrupt |
-| 28     | 31:0 | lr   | Link register                            |
-| 29     | 31:0 | rsp  | Stack pointer (grows downwards)          |
-| 30     | 31:0 | rip  | Instruction pointer                      |
-| 31     | 31:0 | rf   | CPU flags register                       |
+| number | bits | name | description                     |
+| ------ | ---- | ---- | ------------------------------- |
+| 0      | 31:0 | r0   |                                 |
+| 1      | 31:0 | r1   |                                 |
+| 2      | 31:0 | r2   |                                 |
+| 3      | 31:0 | r3   |                                 |
+| 4      | 31:0 | r4   |                                 |
+| 5      | 31:0 | r5   |                                 |
+| 6      | 31:0 | r6   |                                 |
+| 7      | 31:0 | r7   |                                 |
+| 8      | 31:0 | r8   |                                 |
+| 9      | 31:0 | r9   |                                 |
+| 10     | 31:0 | r10  |                                 |
+| 11     | 31:0 | r11  |                                 |
+| 12     | 31:0 | r12  |                                 |
+| 13     | 31:0 | r13  |                                 |
+| 14     | 31:0 | r14  |                                 |
+| 15     | 31:0 | r15  |                                 |
+| 16     | 31:0 | r16  |                                 |
+| 17     | 31:0 | r17  |                                 |
+| 18     | 31:0 | r18  |                                 |
+| 19     | 31:0 | r19  |                                 |
+| 20     | 31:0 | r20  |                                 |
+| 21     | 31:0 | r21  |                                 |
+| 22     | 31:0 | r22  |                                 |
+| 23     | 31:0 | r23  |                                 |
+| 24     | 31:0 | r24  |                                 |
+| 25     | 31:0 | r25  |                                 |
+| 26     | 31:0 | r26  |                                 |
+| 27     | 31:0 | rfp  | Frame pointer                   |
+| 28     | 31:0 | lr   | Link register                   |
+| 29     | 31:0 | rsp  | Stack pointer (grows downwards) |
+| 30     | 31:0 | rip  | Instruction pointer             |
+| 31     | 31:0 | rf   | CPU flags register              |
 
 ### rf (flags register)
 
-| bits  | description      |
-| ----- | ---------------- |
-| 0     | carry flag       |
-| 1     | zero flag        |
-| 2     | alignment        |
-| 23:3  | reserved         |
-| 31:24 | interrupt number |
+| bits | description |
+| ---- | ----------- |
+| 0    | carry flag  |
+| 1    | zero flag   |
+| 31:3 | reserved    |
+
+## System registers
+
+| number | bits | name  | description                                                         |
+| ------ | ---- | ----- | ------------------------------------------------------------------- |
+| 0      | 31:0 | scr0  | Scratch register 0 (reserved for OS use in interrupt handlers etc.) |
+| 1      | 31:0 | scr1  | Scratch register 1 (reserved for OS use in interrupt handlers etc.) |
+| 2      | 31:0 | scr2  | Scratch register 2 (reserved for OS use in interrupt handlers etc.) |
+| 3      | 31:0 | scr3  | Scratch register 3 (reserved for OS use in interrupt handlers etc.) |
+| 4      | 31:0 | irip  | Previous `rip` on interrupt                                         |
+| 5      | 31:0 | ibptr | Base address of Interrupt Block                                     |
+| 6      | 31:0 | pcst  | Processor state                                                     |
+
+### pcst (Processor state register)
+
+| bits  | description                |
+| ----- | -------------------------- |
+| 0     | enable alignment exception |
+| 23:1  | reserved                   |
+| 31:24 | interrupt number           |
 
 ## Interrupts / Exceptions
 
-There are 256 different interrupt numbers. On interrupt the CPU pushes `rip`(pointing to the _next_ instruction in case of an interrupt and to the _current_ instruction in case of an exception) and `rf`, then the interrupt number will be set in `rf`.
-The CPU will jump to the address in `iptr` (ignoring the lower two bits).
+There are 256 different interrupt numbers. On interrupt the CPU saves `rip` (pointing to the _next_ instruction in case of an interrupt and to the _current_ instruction in case of an exception) in `irip`, then the interrupt number will be set in `pcst`.
+If the lowest bit of `ibptr` the CPU will now jump to the address in (`ibptr` & 0xFFFFFFFC).
+If the bit is not set the CPU will jump to ((`ibptr` & 0xFFFFFFFC) + (4*interrupt number)).
 
 | number | type                        | description     |
 | ------ | --------------------------- | --------------- |
-| 0-254  | Hardware/Software Interrupt |                 |
-| 255    | Exception                   | Invalid opcode  |
+| 0-253  | Hardware/Software Interrupt |                 |
 | 254    | Exception                   | Alignment error |
+| 255    | Exception                   | Invalid opcode  |
 
 ## Instruction encoding
 
@@ -202,7 +221,7 @@ Assembler syntax: `cond instr tgt, src`
 | 0x1F   | or    | [E1](#e1)             | 4            | target = source1 \| source2                                                           |            |
 | 0x20   | or    | [E2](#e2)             | 4            | target = source \| imm13                                                              |            |
 | 0x21   | or    | [E3](#e3)             | 4            | target = target \| imm16                                                              |            |
-| 0x21   | or    | [E3](#e3) [inst-sp=1] | 4            | target = target \| (imm16 << 16)                                                      |            |
+| 0x21   | orh   | [E3](#e3) [inst-sp=1] | 4            | target = target \| (imm16 << 16)                                                      |            |
 |        |       |                       |              |                                                                                       |            |
 | 0x22   | xor   | [E1](#e1)             | 4            | target = source1 ^ source2                                                            |            |
 | 0x23   | xor   | [E2](#e2)             | 4            | target = source ^ imm13                                                               |            |
@@ -210,3 +229,6 @@ Assembler syntax: `cond instr tgt, src`
 | 0x24   | xorh  | [E3](#e3) [inst-sp=1] | 4            | target = target ^ (imm16 << 16)                                                       |            |
 |        |       |                       |              |                                                                                       |            |
 | 0x25   | not   | [E7](#e7)             | 4            | target = ~source                                                                      |            |
+|        |       |                       |              |                                                                                       |            |
+| 0x26   | mtsr  | [E7](#e7)             | ?            | copy source register to system register \| sysregs[target] = source                   |            |
+| 0x26   | mfsr  | [E7](#e7) [inst-sp=1] | ?            | copy system register to target register \| target = sysregs[source]                   |            |

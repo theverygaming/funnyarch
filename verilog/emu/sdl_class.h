@@ -32,37 +32,21 @@ public:
         return true;
     }
 
-    void full_redraw(void *buf, size_t buf_size) {
-        SDL_Surface *surface = SDL_GetWindowSurface(sdlwin);
-        for (size_t y = 0; y < height; y++) {
-            for (size_t x = 0; x < width / 8; x++) {
-                size_t idx = (y * (width / 8)) + x;
-                if (idx >= buf_size) {
-                    break;
-                }
-                uint8_t byte = ((uint8_t *)buf)[idx];
-                for (int i = 0; i < 8; i++) {
-                    put_pixel_bw(surface, (x * 8) + i, y, (byte & (1 << i)) != 0);
-                }
-            }
-        }
-        SDL_UpdateWindowSurface(sdlwin);
-    }
-
     void redraw() {
-        if (!dirty) {
-            return;
-        }
-        dirty = false;
-
         SDL_UpdateWindowSurface(sdlwin);
     }
 
     void mem_write(uint32_t _address, uint32_t value) {
-        uint64_t address = _address;
+        if (_address < 0xF0000000) {
+            return;
+        }
+        uint64_t address = _address - 0xF0000000;
         unsigned int x = (address * 8) % width;
         unsigned int y = (address * 8) / width;
-        dirty = true;
+
+        if (y >= height) {
+            return;
+        }
 
         SDL_Surface *surface = SDL_GetWindowSurface(sdlwin);
         for (int i = 0; i < 4; i++) {
@@ -78,6 +62,4 @@ private:
 
     unsigned int width = 640;
     unsigned int height = 480;
-
-    bool dirty = true;
 };

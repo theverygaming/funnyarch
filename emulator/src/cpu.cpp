@@ -35,17 +35,13 @@ void cpu::reset(struct cpu::ctx *ctx) {
 }
 
 static inline CPU_FORCEINLINE uint32_t interrupt(struct cpu::ctx *ctx, uint8_t n) {
-    // push rip
-    ctx->regs[CPU_REG_SP] -= 4;
-    cpu::mem_write(ctx, ctx->regs[CPU_REG_SP], ctx->regs[CPU_REG_IP]);
-    // push flags
-    ctx->regs[CPU_REG_SP] -= 4;
-    cpu::mem_write(ctx, ctx->regs[CPU_REG_SP], ctx->regs[CPU_REG_FLAGS]);
-    // set interrupt number in flags
-    bitset(&ctx->regs[CPU_REG_FLAGS], 24, 8, (uint32_t)n);
+    // save rip
+    ctx->sysregs[CPU_SYSREG_IRIP] = ctx->regs[CPU_REG_RIP];
+    // set interrupt number in pcst
+    bitset(&ctx->sysregs[CPU_SYSREG_PCST], 24, 8, (uint32_t)n);
     // jump
-    ctx->regs[CPU_REG_IP] = ctx->regs[CPU_REG_IPTR] & 0xFFFFFFFC;
-    return 4; // interrupt takes four cycles
+    ctx->regs[CPU_REG_RIP] = (ctx->sysregs[CPU_SYSREG_IBPTR] & 0xFFFFFFFC) + (((ctx->sysregs[CPU_SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * (uint32_t)n));
+    return 4; // interrupt takes four cycles // FIXME: wrongwrongwrong!
 }
 
 static inline CPU_FORCEINLINE bool shouldexecute(struct cpu::ctx *ctx, unsigned int condition) {
@@ -53,17 +49,17 @@ static inline CPU_FORCEINLINE bool shouldexecute(struct cpu::ctx *ctx, unsigned 
     default: // always
         return true;
     case 1: // if equal
-        return (ctx->regs[CPU_REG_FLAGS] & 0b10) != 0;
+        return (ctx->regs[CPU_REG_RF] & 0b10) != 0;
     case 2: // if not equal
-        return (ctx->regs[CPU_REG_FLAGS] & 0b10) == 0;
+        return (ctx->regs[CPU_REG_RF] & 0b10) == 0;
     case 3: // if less than
-        return (ctx->regs[CPU_REG_FLAGS] & 0b01) != 0;
+        return (ctx->regs[CPU_REG_RF] & 0b01) != 0;
     case 4: // if greater than or equal
-        return (ctx->regs[CPU_REG_FLAGS] & 0b01) == 0;
+        return (ctx->regs[CPU_REG_RF] & 0b01) == 0;
     case 5: // if greater than
-        return (ctx->regs[CPU_REG_FLAGS] & 0b11) == 0;
+        return (ctx->regs[CPU_REG_RF] & 0b11) == 0;
     case 6: // if less than or equal
-        return (ctx->regs[CPU_REG_FLAGS] & 0b11) != 0;
+        return (ctx->regs[CPU_REG_RF] & 0b11) != 0;
     }
 }
 
@@ -143,19 +139,19 @@ union enc_7 {
 uint32_t cpu::execute(struct cpu::ctx *ctx, uint32_t instrs) {
     uint32_t clock_cycles = 0;
 begin:
-    uint32_t instr = cpu::mem_read(ctx, ctx->regs[CPU_REG_IP] & 0xFFFFFFFC);
-    ctx->regs[CPU_REG_IP] += 4;
+    uint32_t instr = cpu::mem_read(ctx, ctx->regs[CPU_REG_RIP] & 0xFFFFFFFC);
+    ctx->regs[CPU_REG_RIP] += 4;
     uint8_t opcode = instr & 0x3F;
     uint8_t cond = (instr >> 6) & 0x07;
 
     if (!shouldexecute(ctx, cond)) {
         DEBUG_PRINTF("SKIPPING ");
-        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+        DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_RIP] - 4) & 0xFFFFFFFC, instr, opcode);
         clock_cycles += 3;
         goto finish;
     }
 
-    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
+    DEBUG_PRINTF("ip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_RIP] - 4) & 0xFFFFFFFC, instr, opcode);
 
     switch (opcode) {
     case 0x00: { /* NOP(E6) */
@@ -166,8 +162,8 @@ begin:
     case 0x01: { /* STRPI(E2) */
         union enc_2<long> e;
         e.instr = instr;
-        if (((ctx->regs[31] & 0b100) != 0) && (((ctx->regs[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
-            ctx->regs[CPU_REG_IP] -= 4;
+        if (((ctx->sysregs[CPU_SYSREG_PCST] & 0b1) != 0) && (((ctx->regs[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
+            ctx->regs[CPU_REG_RIP] -= 4;
             clock_cycles += 3;
             clock_cycles += interrupt(ctx, 254);
             break;
@@ -181,7 +177,7 @@ begin:
     case 0x02: { /* JMP(E4) */
         union enc_4<unsigned long> e;
         e.instr = instr;
-        ctx->regs[CPU_REG_IP] = e.str.imm23 * 4;
+        ctx->regs[CPU_REG_RIP] = e.str.imm23 * 4;
         clock_cycles += 3;
         break;
     }
@@ -189,7 +185,7 @@ begin:
     case 0x03: { /* RJMP(E4) */
         union enc_4<long> e;
         e.instr = instr;
-        ctx->regs[CPU_REG_IP] += e.str.imm23 * 4;
+        ctx->regs[CPU_REG_RIP] += e.str.imm23 * 4;
         clock_cycles += 3;
         break;
     }
@@ -202,7 +198,7 @@ begin:
         break;
     }
 
-    case 0x05: { /* MOV(E3) */
+    case 0x05: { /* MOV(E3) MOVH(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
@@ -217,8 +213,8 @@ begin:
     case 0x06: { /* LDR(E2) */
         union enc_2<long> e;
         e.instr = instr;
-        if (((ctx->regs[31] & 0b100) != 0) && (((ctx->regs[e.str.src] + e.str.imm13) & 0b11) != 0)) {
-            ctx->regs[CPU_REG_IP] -= 4;
+        if (((ctx->sysregs[CPU_SYSREG_PCST] & 0b1) != 0) && (((ctx->regs[e.str.src] + e.str.imm13) & 0b11) != 0)) {
+            ctx->regs[CPU_REG_RIP] -= 4;
             clock_cycles += 3;
             clock_cycles += interrupt(ctx, 254);
             break;
@@ -231,8 +227,8 @@ begin:
     case 0x07: { /* LDRI(E2) */
         union enc_2<long> e;
         e.instr = instr;
-        if (((ctx->regs[31] & 0b100) != 0) && ((ctx->regs[e.str.src] & 0b11) != 0)) {
-            ctx->regs[CPU_REG_IP] -= 4;
+        if (((ctx->sysregs[CPU_SYSREG_PCST] & 0b1) != 0) && ((ctx->regs[e.str.src] & 0b11) != 0)) {
+            ctx->regs[CPU_REG_RIP] -= 4;
             clock_cycles += 3;
             clock_cycles += interrupt(ctx, 254);
             break;
@@ -246,8 +242,8 @@ begin:
     case 0x08: { /* STR(E2) */
         union enc_2<long> e;
         e.instr = instr;
-        if (((ctx->regs[31] & 0b100) != 0) && (((ctx->regs[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
-            ctx->regs[CPU_REG_IP] -= 4;
+        if (((ctx->sysregs[CPU_SYSREG_PCST] & 0b1) != 0) && (((ctx->regs[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
+            ctx->regs[CPU_REG_RIP] -= 4;
             clock_cycles += 3;
             clock_cycles += interrupt(ctx, 254);
             break;
@@ -260,8 +256,8 @@ begin:
     case 0x09: { /* STRI(E2) */
         union enc_2<long> e;
         e.instr = instr;
-        if (((ctx->regs[31] & 0b100) != 0) && ((ctx->regs[e.str.tgt] & 0b11) != 0)) {
-            ctx->regs[CPU_REG_IP] -= 4;
+        if (((ctx->sysregs[CPU_SYSREG_PCST] & 0b1) != 0) && ((ctx->regs[e.str.tgt] & 0b11) != 0)) {
+            ctx->regs[CPU_REG_RIP] -= 4;
             clock_cycles += 3;
             clock_cycles += interrupt(ctx, 254);
             break;
@@ -275,8 +271,8 @@ begin:
     case 0x0a: { /* JAL(E4) */
         union enc_4<unsigned long> e;
         e.instr = instr;
-        ctx->regs[CPU_REG_LR] = ctx->regs[CPU_REG_IP];
-        ctx->regs[CPU_REG_IP] = e.str.imm23 * 4;
+        ctx->regs[CPU_REG_LR] = ctx->regs[CPU_REG_RIP];
+        ctx->regs[CPU_REG_RIP] = e.str.imm23 * 4;
         clock_cycles += 3;
         break;
     }
@@ -284,8 +280,8 @@ begin:
     case 0x0b: { /* RJAL(E4) */
         union enc_4<long> e;
         e.instr = instr;
-        ctx->regs[CPU_REG_LR] = ctx->regs[CPU_REG_IP];
-        ctx->regs[CPU_REG_IP] += e.str.imm23 * 4;
+        ctx->regs[CPU_REG_LR] = ctx->regs[CPU_REG_RIP];
+        ctx->regs[CPU_REG_RIP] += e.str.imm23 * 4;
         clock_cycles += 3;
         break;
     }
@@ -295,8 +291,8 @@ begin:
         e.instr = instr;
         uint32_t result;
         bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], ctx->regs[e.str.src], &result);
-        bitset(&ctx->regs[CPU_REG_FLAGS], 0, carry);
-        bitset(&ctx->regs[CPU_REG_FLAGS], 1, result == 0);
+        bitset(&ctx->regs[CPU_REG_RF], 0, carry);
+        bitset(&ctx->regs[CPU_REG_RF], 1, result == 0);
         clock_cycles += 4;
         break;
     }
@@ -306,8 +302,8 @@ begin:
         e.instr = instr;
         uint32_t result;
         bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], e.str.imm16, &result);
-        bitset(&ctx->regs[CPU_REG_FLAGS], 0, carry);
-        bitset(&ctx->regs[CPU_REG_FLAGS], 1, result == 0);
+        bitset(&ctx->regs[CPU_REG_RF], 0, carry);
+        bitset(&ctx->regs[CPU_REG_RF], 1, result == 0);
         clock_cycles += 4;
         break;
     }
@@ -319,7 +315,7 @@ begin:
         uint8_t intn = e.str.imm23 & 0xFF;
         // exceptions cannot be thrown with the int instruction
         if (intn >= 254) {
-            ctx->regs[CPU_REG_IP] -= 4;
+            ctx->regs[CPU_REG_RIP] -= 4;
             intn = 255;
         }
         clock_cycles += interrupt(ctx, intn);
@@ -342,7 +338,7 @@ begin:
         break;
     }
 
-    case 0x12: { /* ADD(E3) */
+    case 0x12: { /* ADD(E3) ADDH(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
@@ -370,7 +366,7 @@ begin:
         break;
     }
 
-    case 0x15: { /* SUB(E3) */
+    case 0x15: { /* SUB(E3) SUBH(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
@@ -446,7 +442,7 @@ begin:
         break;
     }
 
-    case 0x1E: { /* AND(E3) */
+    case 0x1E: { /* AND(E3) ANDH(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
@@ -474,7 +470,7 @@ begin:
         break;
     }
 
-    case 0x21: { /* OR(E3) */
+    case 0x21: { /* OR(E3) ORH(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
@@ -502,7 +498,7 @@ begin:
         break;
     }
 
-    case 0x24: { /* XOR(E3) */
+    case 0x24: { /* XOR(E3) XORH(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
         if (e.str.instr_spe == 0b01) {
@@ -522,9 +518,33 @@ begin:
         break;
     }
 
+    case 0x26: { /* MTSR(E7) MFSR(E7) */
+        union enc_7 e;
+        e.instr = instr;
+        if (e.str.instr_spe == 1) { // MFSR
+            if (e.str.src >= 7) {
+                ctx->regs[CPU_REG_RIP] -= 4;
+                clock_cycles += 3;
+                clock_cycles += interrupt(ctx, 255);
+                break;
+            }
+            ctx->regs[e.str.tgt] = ctx->sysregs[e.str.src];
+        } else { // MTSR
+            if (e.str.tgt >= 7) {
+                ctx->regs[CPU_REG_RIP] -= 4;
+                clock_cycles += 3;
+                clock_cycles += interrupt(ctx, 255);
+                break;
+            }
+            ctx->sysregs[e.str.tgt] = ctx->regs[e.str.src];
+        }
+        clock_cycles += 3;
+        break;
+    }
+
     default:
-        INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_IP] - 4) & 0xFFFFFFFC, instr, opcode);
-        ctx->regs[CPU_REG_IP] -= 4;
+        INFO_PRINTF("invalid opcode! rip: 0x%x istr: 0x%x opc: 0x%x\n", (ctx->regs[CPU_REG_RIP] - 4) & 0xFFFFFFFC, instr, opcode);
+        ctx->regs[CPU_REG_RIP] -= 4;
         clock_cycles += 3;
         clock_cycles += interrupt(ctx, 255);
         // throw cpu_except(cpu_except::etype::INVALIDOPCODE);

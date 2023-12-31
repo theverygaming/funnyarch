@@ -93,17 +93,19 @@ function twosComplement(num, bits) {
 }
 
 class funnyarchCPU {
-    #REG_RFP = 26;
-    #REG_IPTR = 27;
     #REG_LR = 28;
     #REG_RSP = 29;
     #REG_RIP = 30;
-    #REG_FLAGS = 31;
+    #REG_RF = 31;
+    #SYSREG_IRIP = 4
+    #SYSREG_IBPTR = 5
+    #SYSREG_PCST = 6
 
     constructor(memRead, memWrite) {
         this.memRead = memRead;
         this.memWrite = memWrite;
         this.registers = new Uint32Array(32);
+        this.sysregisters = new Uint32Array(7);
         this.reset();
     }
 
@@ -114,16 +116,12 @@ class funnyarchCPU {
     }
 
     interrupt(n) {
-        // push rip
-        this.registers[this.#REG_RSP] -= 4;
-        this.memWrite(this.registers[this.#REG_RSP], this.registers[this.#REG_RIP]);
-        // push flags
-        this.registers[this.#REG_RSP] -= 4;
-        this.memWrite(this.registers[this.#REG_RSP], this.registers[this.#REG_FLAGS]);
-        // set interrupt number in flags
-        this.registers[this.#REG_FLAGS] = ((this.registers[this.#REG_FLAGS] & 0x00FFFFFF) | (n & 0xFF) << 24) >>> 0;
+        // save rip
+        this.sysregisters[this.#SYSREG_IRIP] = this.registers[this.#REG_RIP];
+        // set interrupt number in pcst
+        this.sysregisters[this.#SYSREG_PCST] = ((this.sysregisters[this.#SYSREG_PCST] & 0x00FFFFFF) | (n & 0xFF) << 24) >>> 0;
         // jump
-        this.registers[this.#REG_RIP] = this.registers[this.#REG_IPTR] & 0xFFFFFFFC;
+        this.registers[this.#REG_RIP] = ((this.sysregisters[this.#SYSREG_IBPTR] & 0xFFFFFFFC) + (((this.sysregisters[this.#SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * n))) >>> 0;
     }
 
     #shouldexecute(condition) {
@@ -131,17 +129,17 @@ class funnyarchCPU {
             default: // always
                 return true;
             case 1: // if equal
-                return (this.registers[this.#REG_FLAGS] & 0b10) != 0;
+                return (this.registers[this.#REG_RF] & 0b10) != 0;
             case 2: // if not equal
-                return (this.registers[this.#REG_FLAGS] & 0b10) == 0;
+                return (this.registers[this.#REG_RF] & 0b10) == 0;
             case 3: // if less than
-                return (this.registers[this.#REG_FLAGS] & 0b01) != 0;
+                return (this.registers[this.#REG_RF] & 0b01) != 0;
             case 4: // if greater than or equal
-                return (this.registers[this.#REG_FLAGS] & 0b01) == 0;
+                return (this.registers[this.#REG_RF] & 0b01) == 0;
             case 5: // if greater than
-                return (this.registers[this.#REG_FLAGS] & 0b11) == 0;
+                return (this.registers[this.#REG_RF] & 0b11) == 0;
             case 6: // if less than or equal
-                return (this.registers[this.#REG_FLAGS] & 0b11) != 0;
+                return (this.registers[this.#REG_RF] & 0b11) != 0;
         }
     }
 
@@ -171,7 +169,7 @@ class funnyarchCPU {
                 case 0x01: { /* STRPI(E2) */
                     let e = new funnyarchCPUInstrEncoding2(instr);
                     e.str.imm13 = twosComplement(e.str.imm13, 13);
-                    if (((this.registers[this.#REG_FLAGS] & 0b100) != 0) && (((this.registers[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
+                    if (((this.sysregisters[this.#SYSREG_PCST] & 0b1) != 0) && (((this.registers[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
                         this.registers[this.#REG_RIP] -= 4;
                         this.interrupt(254);
                         break;
@@ -199,7 +197,7 @@ class funnyarchCPU {
                     break;
                 }
 
-                case 0x05: { /* MOV(E3) */
+                case 0x05: { /* MOV(E3) MOVH(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     if (e.str.instr_spe === 0b01) {
                         this.registers[e.str.tgt] = (this.registers[e.str.tgt] & 0xFFFF) | (e.str.imm16 << 16);
@@ -212,7 +210,7 @@ class funnyarchCPU {
                 case 0x06: { /* LDR(E2) */
                     let e = new funnyarchCPUInstrEncoding2(instr);
                     e.str.imm13 = twosComplement(e.str.imm13, 13);
-                    if (((this.registers[this.#REG_FLAGS] & 0b100) != 0) && (((this.registers[e.str.src] + e.str.imm13) & 0b11) != 0)) {
+                    if (((this.sysregisters[this.#SYSREG_PCST] & 0b1) != 0) && (((this.registers[e.str.src] + e.str.imm13) & 0b11) != 0)) {
                         this.registers[this.#REG_RIP] -= 4;
                         this.interrupt(254);
                         break;
@@ -224,7 +222,7 @@ class funnyarchCPU {
                 case 0x07: { /* LDRI(E2) */
                     let e = new funnyarchCPUInstrEncoding2(instr);
                     e.str.imm13 = twosComplement(e.str.imm13, 13);
-                    if (((this.registers[this.#REG_FLAGS] & 0b100) != 0) && ((this.registers[e.str.src] & 0b11) != 0)) {
+                    if (((this.sysregisters[this.#SYSREG_PCST] & 0b1) != 0) && ((this.registers[e.str.src] & 0b11) != 0)) {
                         this.registers[this.#REG_RIP] -= 4;
                         this.interrupt(254);
                         break;
@@ -237,7 +235,7 @@ class funnyarchCPU {
                 case 0x08: { /* STR(E2) */
                     let e = new funnyarchCPUInstrEncoding2(instr);
                     e.str.imm13 = twosComplement(e.str.imm13, 13);
-                    if (((this.registers[this.#REG_FLAGS] & 0b100) != 0) && (((this.registers[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
+                    if (((this.sysregisters[this.#SYSREG_PCST] & 0b1) != 0) && (((this.registers[e.str.tgt] + e.str.imm13) & 0b11) != 0)) {
                         this.registers[this.#REG_RIP] -= 4;
                         this.interrupt(254);
                         break;
@@ -249,7 +247,7 @@ class funnyarchCPU {
                 case 0x09: { /* STRI(E2) */
                     let e = new funnyarchCPUInstrEncoding2(instr);
                     e.str.imm13 = twosComplement(e.str.imm13, 13);
-                    if (((this.registers[this.#REG_FLAGS] & 0b100) != 0) && ((this.registers[e.str.tgt] & 0b11) != 0)) {
+                    if (((this.sysregisters[this.#SYSREG_PCST] & 0b1) != 0) && ((this.registers[e.str.tgt] & 0b11) != 0)) {
                         this.registers[this.#REG_RIP] -= 4;
                         this.interrupt(254);
                         break;
@@ -277,16 +275,16 @@ class funnyarchCPU {
                 case 0x0c: { /* CMP(E7) */
                     let e = new funnyarchCPUInstrEncoding7(instr);
                     let res = subtract_overflow(this.registers[e.str.tgt], this.registers[e.str.src]);
-                    this.registers[this.#REG_FLAGS] = ((this.registers[this.#REG_FLAGS] & 0xFFFFFFFE) | ((res.carry ? 1 : 0)) << 0) >>> 0;
-                    this.registers[this.#REG_FLAGS] = ((this.registers[this.#REG_FLAGS] & 0xFFFFFFFD) | (((res.result == 0) ? 1 : 0) << 1)) >>> 0;
+                    this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFE) | ((res.carry ? 1 : 0)) << 0) >>> 0;
+                    this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFD) | (((res.result == 0) ? 1 : 0) << 1)) >>> 0;
                     break;
                 }
 
                 case 0x0d: { /* CMP(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     let res = subtract_overflow(this.registers[e.str.tgt], e.str.imm16);
-                    this.registers[this.#REG_FLAGS] = ((this.registers[this.#REG_FLAGS] & 0xFFFFFFFE) | ((res.carry ? 1 : 0)) << 0) >>> 0;
-                    this.registers[this.#REG_FLAGS] = ((this.registers[this.#REG_FLAGS] & 0xFFFFFFFD) | (((res.result == 0) ? 1 : 0) << 1)) >>> 0;
+                    this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFE) | ((res.carry ? 1 : 0)) << 0) >>> 0;
+                    this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFD) | (((res.result == 0) ? 1 : 0) << 1)) >>> 0;
                     break;
                 }
 
@@ -314,7 +312,7 @@ class funnyarchCPU {
                     break;
                 }
 
-                case 0x12: { /* ADD(E3) */
+                case 0x12: { /* ADD(E3) ADDH(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     if (e.str.instr_spe == 0b01) {
                         this.registers[e.str.tgt] += e.str.imm16 << 16;
@@ -336,7 +334,7 @@ class funnyarchCPU {
                     break;
                 }
 
-                case 0x15: { /* SUB(E3) */
+                case 0x15: { /* SUB(E3) SUBH(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     if (e.str.instr_spe == 0b01) {
                         this.registers[e.str.tgt] -= e.str.imm16 << 16;
@@ -394,7 +392,7 @@ class funnyarchCPU {
                     break;
                 }
 
-                case 0x1E: { /* AND(E3) */
+                case 0x1E: { /* AND(E3) ANDH(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     if (e.str.instr_spe == 0b01) {
                         this.registers[e.str.tgt] &= (e.str.imm16 << 16) >>> 0;
@@ -416,7 +414,7 @@ class funnyarchCPU {
                     break;
                 }
 
-                case 0x21: { /* OR(E3) */
+                case 0x21: { /* OR(E3) ORH(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     if (e.str.instr_spe == 0b01) {
                         this.registers[e.str.tgt] |= (e.str.imm16 << 16) >>> 0;
@@ -438,7 +436,7 @@ class funnyarchCPU {
                     break;
                 }
 
-                case 0x24: { /* XOR(E3) */
+                case 0x24: { /* XOR(E3) XORH(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
                     if (e.str.instr_spe == 0b01) {
                         this.registers[e.str.tgt] ^= (e.str.imm16 << 16) >>> 0;
@@ -451,6 +449,27 @@ class funnyarchCPU {
                 case 0x25: { /* NOT(E7) */
                     let e = new funnyarchCPUInstrEncoding7(instr);
                     this.registers[e.str.tgt] = (~this.registers[e.str.src]) >>> 0;
+                    break;
+                }
+
+                case 0x26: { /* MTSR(E7) MFSR(E7) */
+                    let e = new funnyarchCPUInstrEncoding7(instr);
+                    e.instr = instr;
+                    if (e.str.instr_spe == 1) { // MFSR
+                        if (e.str.src >= 7) {
+                            this.registers[this.#REG_RIP] -= 4;
+                            interrupt(255);
+                            break;
+                        }
+                        this.registers[e.str.tgt] = this.sysregisters[e.str.src];
+                    } else { // MTSR
+                        if (e.str.tgt >= 7) {
+                            this.registers[this.#REG_RIP] -= 4;
+                            interrupt(255);
+                            break;
+                        }
+                        this.sysregisters[e.str.tgt] = this.registers[e.str.src];
+                    }
                     break;
                 }
 

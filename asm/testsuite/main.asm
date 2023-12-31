@@ -9,9 +9,12 @@ rjmp main
 #include "interrupt.asm"
 
 main:
-or rf, #0b100 // set alignment flag
+mov r0, #0b1 // set alignment flag
+mtsr pcst, r0
 mov rsp, #0x23E0
-mov iptr, int_handler
+mov r0, int_handler
+or r0, r0, #0x1 // no jump table
+mtsr ibptr, r0
 int #0 // FIXME: we need a proper test for interrupts (and exceptions)
 push(lr)
 mov r0, str_mainruns

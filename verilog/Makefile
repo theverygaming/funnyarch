@@ -1,7 +1,7 @@
 .NOTPARALLEL:
 
 .PHONY: all
-all: test emulator emulator_fpga
+all: test emulator # emulator_fpga
 
 .PHONY: clean
 clean:

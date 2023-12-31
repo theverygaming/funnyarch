@@ -13,8 +13,11 @@ rjmp main
 // r11 = next memory location
 
 main:
-or rf, #0b100 // set alignment flag
-mov iptr, entry
+mov r0, #0b1 // set alignment flag
+mtsr pcst, r0
+mov r0, entry
+or r0, r0, #0x1 // no jump table
+mtsr ibptr, r0
 push(lr)
 mov rsp, #0x2100
 mov r0, #0x5C // '\'

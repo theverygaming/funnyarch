@@ -29,7 +29,7 @@ int main(int argc, char **argv, char **env) {
     vluint64_t t;
     std::ifstream inf("output.bin", std::ios::binary);
     std::ofstream outf("output.txt");
-    size_t memsize = (640 * 480) / 8;
+    size_t memsize = 8192 + 4096;
     unsigned char *mem = new unsigned char[memsize];
     memset(mem, 0, memsize);
     for (size_t i = 0; i < memsize; i++) {
@@ -41,8 +41,6 @@ int main(int argc, char **argv, char **env) {
     inf.close();
 
     auto start = std::chrono::high_resolution_clock::now();
-    // for (t = 0; t < ((4) * (2 * 4)) + (4); t++) {
-    // for (t = 0; t < 100; t++) {
     for (t = 0; true; t++) {
         cpu->clk ^= 1;
 
@@ -57,20 +55,34 @@ int main(int argc, char **argv, char **env) {
 #ifdef TRACE
                 fprintf(stderr, "mem write A: 0x%x D: 0x%x\n", cpu->address, cpu->data_out);
 #endif
+                if (cpu->address >= 0xF0000000) {
+                    if (cpu->address == 0xF004B000) {
+                        outf.write((const char *)&cpu->data_out, 1);
+                        printf("%c", (char)cpu->data_out);
+                        fprintf(stderr, "%c", cpu->data_out);
+                    }
+#ifdef GRAPHICS
+                    sdl.mem_write(cpu->address, cpu->data_out);
+#endif
+                    goto continue_loop;
+                }
                 if (cpu->address >= memsize - 4) {
+                    fprintf(stderr, "invalid memaddr 0x%x\n", cpu->address);
                     break;
                 }
-                *(uint32_t *)&mem[cpu->address] = cpu->data_out; // TODO: endianness
-                if (cpu->address == 0xF004B000) {
-                    outf.write((const char *)&mem[cpu->address], 1);
-                    printf("%c", mem[cpu->address]);
-                    fprintf(stderr, "OUTPUT CHAR: %c\n", mem[cpu->address]);
+                if (cpu->address >= 0x2000) {                        // do not overwrite ROM
+                    *(uint32_t *)&mem[cpu->address] = cpu->data_out; // TODO: endianness
+                } else {
+                    fprintf(stderr, "invalid memaddr 0x%x (ROM!!)\n", cpu->address);
+                    break;
                 }
-#ifdef GRAPHICS
-                sdl.mem_write(cpu->address, cpu->data_out);
-#endif
             } else {
+                if (cpu->address >= 0xF0000000) {
+                    cpu->data_in = rand();
+                    goto continue_loop;
+                }
                 if (cpu->address >= memsize - 4) {
+                    fprintf(stderr, "invalid memaddr 0x%x\n", cpu->address);
                     break;
                 }
                 cpu->data_in = *(uint32_t *)&mem[cpu->address]; // TODO: endianness
@@ -79,6 +91,7 @@ int main(int argc, char **argv, char **env) {
 #endif
             }
         }
+    continue_loop:
         cpu->reset = t < 2 ? 1 : 0;
 
         cpu->eval();
@@ -100,7 +113,7 @@ int main(int argc, char **argv, char **env) {
         m_trace->dump(t);
 #endif
 #ifdef GRAPHICS
-        if (t % 400000 == 0) {
+        if (t % 1000 == 0) {
             sdl.redraw();
             if (!sdl.update_events()) {
                 break;
@@ -120,7 +133,7 @@ int main(int argc, char **argv, char **env) {
         fprintf(stderr, "r%d: 0x%x \n", i, cpu->rootp->cpu__DOT__ctrl__DOT__regarr[i]);
     }
 #ifdef GRAPHICS
-    sdl.full_redraw(mem, memsize);
+    sdl.redraw();
     while (true) {
         if (!sdl.update_events()) {
             break;

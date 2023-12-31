@@ -178,6 +178,12 @@ instructions = {
     "not": [
         Instruction(InstructionType.E7, 0x25),
     ],
+    "mtsr": [
+        Instruction(InstructionType.E7, 0x26),
+    ],
+    "mfsr": [
+        Instruction(InstructionType.E7, 0x26, instrspecific=1),
+    ]
 }
 
 conditionmap = {
@@ -223,12 +229,19 @@ regmap = {
     "r23": 23,
     "r24": 24,
     "r25": 25,
-    "rfp": 26,
-    "iptr": 27,
+    "r26": 26,
+    "rfp": 27,
     "lr": 28,
     "rsp": 29,
     "rip": 30,
     "rf": 31,
+    "scr0": 0,
+    "scr1": 1,
+    "scr2": 2,
+    "scr3": 3,
+    "irip": 4,
+    "ibptr": 5,
+    "pcst": 6,
 }
 
 regmap_alias = {}

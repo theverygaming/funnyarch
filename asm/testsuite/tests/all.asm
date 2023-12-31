@@ -8,6 +8,8 @@
 #include "tests/xortest.asm"
 #include "tests/nottest.asm"
 #include "tests/movtest.asm"
+#include "tests/regtest.asm"
+#include "tests/sysregtest.asm"
 
 alltests:
 push(lr)
@@ -21,5 +23,7 @@ rcall(ortest)
 rcall(xortest)
 rcall(nottest)
 rcall(movtest)
+rcall(regtest)
+rcall(sysregtest)
 pop(lr)
 ret
