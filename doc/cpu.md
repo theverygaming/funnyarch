@@ -41,7 +41,7 @@
 | ---- | ----------- |
 | 0    | carry flag  |
 | 1    | zero flag   |
-| 31:3 | reserved    |
+| 31:2 | reserved    |
 
 ## System registers
 

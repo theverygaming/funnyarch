@@ -4,6 +4,10 @@
 
 *.vcd
 
+*.gcda
+*.gcno
+*.gcov
+
 imgui.ini
 
 /emulator/emu

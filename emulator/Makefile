@@ -14,7 +14,14 @@ LDFLAGS += -s TOTAL_MEMORY=70057984 -sALLOW_MEMORY_GROWTH=1 -sUSE_SDL=2 --preloa
 TARGET_EXTRADEPS = output.bin
 TARGET_FILE_EXTENSION = .html
 else
+ifeq ($(TARGET),linux-gcov)
+# default is used for CXX
+SDL2_CONFIG = sdl2-config
+CXXFLAGS += -Wall -Wextra -g -fprofile-arcs -ftest-coverage `$(SDL2_CONFIG) --cflags`
+LDFLAGS += `$(SDL2_CONFIG) --libs` -lgcov --coverage
+else
 $(error unknown TARGET)
+endif
 endif
 endif
 
