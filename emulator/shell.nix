@@ -7,7 +7,7 @@ stdenv.mkDerivation {
   buildInputs = [
     SDL2
 
-    emscripten
+    #emscripten
 
     python311
   ];

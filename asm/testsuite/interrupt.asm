@@ -17,11 +17,16 @@ push(r2)
 
 mfsr r0, pcst
 shr r0, r0, #24 // interrupt number in r0
+
+// alignment fault
 cmp r0, #254
 ifeq mfsr r0, pcst
 ifeq xor r0, #0b1 // unset alignment flag
 ifeq mtsr pcst, r0
 ifeq rjmp .int_handler_p1
+
+// unknown fault
+cmp r0, #253
 .int_handler_l1:
 ifgteq rjmp .int_handler_l1
 

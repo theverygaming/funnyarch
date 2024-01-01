@@ -120,6 +120,8 @@ class funnyarchCPU {
         this.sysregisters[this.#SYSREG_IRIP] = this.registers[this.#REG_RIP];
         // set interrupt number in pcst
         this.sysregisters[this.#SYSREG_PCST] = ((this.sysregisters[this.#SYSREG_PCST] & 0x00FFFFFF) | (n & 0xFF) << 24) >>> 0;
+        // unset usermode bit
+        this.sysregisters[this.#SYSREG_PCST] = this.sysregisters[this.#SYSREG_PCST] & ~0b10;
         // jump
         this.registers[this.#REG_RIP] = ((this.sysregisters[this.#SYSREG_IBPTR] & 0xFFFFFFFC) + (((this.sysregisters[this.#SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * n))) >>> 0;
     }
@@ -292,7 +294,7 @@ class funnyarchCPU {
                     let e = new funnyarchCPUInstrEncoding4(instr);
                     let intn = e.str.imm23 & 0xFF;
                     // exceptions cannot be thrown with the int instruction
-                    if (intn >= 254) {
+                    if (intn >= 253) {
                         this.registers[this.#REG_RIP] -= 4;
                         intn = 255;
                     }
@@ -455,17 +457,22 @@ class funnyarchCPU {
                 case 0x26: { /* MTSR(E7) MFSR(E7) */
                     let e = new funnyarchCPUInstrEncoding7(instr);
                     e.instr = instr;
+                    if ((this.sysregisters[this.#SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+                        this.registers[this.#REG_RIP] -= 4;
+                        this.interrupt(253);
+                        break;
+                    }
                     if (e.str.instr_spe == 1) { // MFSR
                         if (e.str.src >= 7) {
                             this.registers[this.#REG_RIP] -= 4;
-                            interrupt(255);
+                            this.interrupt(255);
                             break;
                         }
                         this.registers[e.str.tgt] = this.sysregisters[e.str.src];
                     } else { // MTSR
                         if (e.str.tgt >= 7) {
                             this.registers[this.#REG_RIP] -= 4;
-                            interrupt(255);
+                            this.interrupt(255);
                             break;
                         }
                         this.sysregisters[e.str.tgt] = this.registers[e.str.src];

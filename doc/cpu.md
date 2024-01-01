@@ -60,20 +60,23 @@
 | bits  | description                |
 | ----- | -------------------------- |
 | 0     | enable alignment exception |
+| 1     | enable usermode            |
 | 23:1  | reserved                   |
 | 31:24 | interrupt number           |
 
 ## Interrupts / Exceptions
 
-There are 256 different interrupt numbers. On interrupt the CPU saves `rip` (pointing to the _next_ instruction in case of an interrupt and to the _current_ instruction in case of an exception) in `irip`, then the interrupt number will be set in `pcst`.
+There are 256 different interrupt numbers.
+On interrupt the CPU saves `rip` (pointing to the _next_ instruction in case of an interrupt and to the _current_ instruction in case of an exception) in `irip`, then the interrupt number will be set in `pcst` and the usermode bit will be unset.
 If the lowest bit of `ibptr` the CPU will now jump to the address in (`ibptr` & 0xFFFFFFFC).
 If the bit is not set the CPU will jump to ((`ibptr` & 0xFFFFFFFC) + (4*interrupt number)).
 
-| number | type                        | description     |
-| ------ | --------------------------- | --------------- |
-| 0-253  | Hardware/Software Interrupt |                 |
-| 254    | Exception                   | Alignment error |
-| 255    | Exception                   | Invalid opcode  |
+| number | type                        | description      |
+| ------ | --------------------------- | ---------------- |
+| 0-252  | Hardware/Software Interrupt |                  |
+| 253    | Exception                   | Protection fault |
+| 254    | Exception                   | Alignment fault  |
+| 255    | Exception                   | Invalid opcode   |
 
 ## Instruction encoding
 

@@ -39,6 +39,8 @@ static inline CPU_FORCEINLINE uint32_t interrupt(struct cpu::ctx *ctx, uint8_t n
     ctx->sysregs[CPU_SYSREG_IRIP] = ctx->regs[CPU_REG_RIP];
     // set interrupt number in pcst
     bitset(&ctx->sysregs[CPU_SYSREG_PCST], 24, 8, (uint32_t)n);
+    // unset usermode bit
+    ctx->sysregs[CPU_SYSREG_PCST] = ctx->sysregs[CPU_SYSREG_PCST] & ~0b10ul;
     // jump
     ctx->regs[CPU_REG_RIP] = (ctx->sysregs[CPU_SYSREG_IBPTR] & 0xFFFFFFFC) + (((ctx->sysregs[CPU_SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * (uint32_t)n));
     return 4; // interrupt takes four cycles // FIXME: wrongwrongwrong!
@@ -314,7 +316,7 @@ begin:
         clock_cycles += 3;
         uint8_t intn = e.str.imm23 & 0xFF;
         // exceptions cannot be thrown with the int instruction
-        if (intn >= 254) {
+        if (intn >= 253) {
             ctx->regs[CPU_REG_RIP] -= 4;
             intn = 255;
         }
@@ -521,6 +523,12 @@ begin:
     case 0x26: { /* MTSR(E7) MFSR(E7) */
         union enc_7 e;
         e.instr = instr;
+        if ((ctx->sysregs[CPU_SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+            ctx->regs[CPU_REG_RIP] -= 4;
+            clock_cycles += 3;
+            clock_cycles += interrupt(ctx, 253);
+            break;
+        }
         if (e.str.instr_spe == 1) { // MFSR
             if (e.str.src >= 7) {
                 ctx->regs[CPU_REG_RIP] -= 4;

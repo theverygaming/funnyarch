@@ -1,15 +1,15 @@
 // tmpreg should not have the same register number as regnum
-#define sysregtest_test_system_register(regnum, tmpreg) mov tmpreg, #64535 \
+#define sysregtest_test_system_register(regnum, tmpreg) mov tmpreg, #65237 \
                                                         mov regnum, #1 \
                                                         mtsr regnum, tmpreg \
                                                         cmp regnum, #1 \
                                                         ifneq rjmp .regtest_failed \
                                                         mov tmpreg, #5 \
                                                         mfsr tmpreg, regnum \
-                                                        cmp tmpreg, #64535 \
+                                                        cmp tmpreg, #65237 \
                                                         ifneq rjmp .regtest_failed \
                                                         mov tmpreg, #0 \
-                                                        movh tmpreg, #64535 \
+                                                        movh tmpreg, #65237 \
                                                         mov regnum, #1 \
                                                         mtsr regnum, tmpreg \
                                                         cmp regnum, #1 \
@@ -17,7 +17,7 @@
                                                         mov tmpreg, #5 \
                                                         mfsr tmpreg, regnum \
                                                         shr tmpreg, tmpreg, #16 \
-                                                        cmp tmpreg, #64535 \
+                                                        cmp tmpreg, #65237 \
                                                         ifneq rjmp .regtest_failed
 
 sysregtest:
@@ -30,7 +30,9 @@ sysregtest_test_system_register(scr1, r0)
 sysregtest_test_system_register(scr2, r0)
 sysregtest_test_system_register(scr3, r0)
 sysregtest_test_system_register(irip, r0)
+mfsr r1, ibptr
 sysregtest_test_system_register(ibptr, r0)
+mtsr ibptr, r1
 sysregtest_test_system_register(pcst, r0)
 
 mov r1, #0

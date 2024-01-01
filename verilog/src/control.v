@@ -39,6 +39,7 @@ module control (
     begin
       sysregarr[`SYSREG_IRIP] <= (exception == 1) ? (regarr[`REG_RIP] - 4) : regarr[`REG_RIP];
       sysregarr[`SYSREG_PCST][31:24] <= intnum;
+      sysregarr[`SYSREG_PCST][1] <= 0; // unset usermode
       if (sysregarr[`SYSREG_IBPTR][0] != 0)
         regarr[`REG_RIP] <= {sysregarr[`SYSREG_IBPTR][31:2], 2'h0};
       else regarr[`REG_RIP] <= {sysregarr[`SYSREG_IBPTR][31:2], 2'h0} + {22'h0, intnum, 2'h0};
@@ -180,7 +181,7 @@ module control (
           end
           6'h0e: begin  /* INT(E4) */
             // exceptions cannot be thrown with the int instruction
-            if (instr[16:9] >= 254) begin
+            if (instr[16:9] >= 253) begin
               interrupt(255, 1);
             end else begin
               interrupt(instr[16:9], 0);
@@ -323,7 +324,9 @@ module control (
             state <= `STATE_WRITEBACK;
           end
           6'h26: begin  /* MTSR(E7) MFSR(E7) */
-            if ((instr[31:19] == 13'h1 && instr[13:9] >= 7) || (instr[31:19] == 13'h0 && instr[18:14] >= 7)) begin
+            if (sysregarr[`SYSREG_PCST][1] != 0) begin // instruction is not allowed in usermode
+              interrupt(253, 1);
+            end else if ((instr[31:19] == 13'h1 && instr[13:9] >= 7) || (instr[31:19] == 13'h0 && instr[18:14] >= 7)) begin
               interrupt(255, 1);
             end else begin
               if (instr[31:19] == 13'h1) begin  // MFSR
