@@ -30,8 +30,10 @@ public:
         if (SDL_Init(SDL_INIT_VIDEO) != 0) {
             exit(1);
         }
+        SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
 
-        sdl_window = SDL_CreateWindow("funnyarch", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, SDL_WINDOW_RESIZABLE);
+        sdl_window =
+            SDL_CreateWindow("funnyarch", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN);
 
         sdl_renderer = SDL_CreateRenderer(sdl_window, -1, 0);
         if (sdl_renderer == nullptr) {
@@ -145,14 +147,24 @@ public:
         if (_address < 0xF0000000) {
             return;
         }
-        uint64_t address = _address - 0xF0000000;
-        unsigned int y = (address * 8) / width;
-        if (y >= height) {
-            return;
+
+        const uint32_t FB_MAX = (width * height) / 8;
+
+        uint32_t address1 = _address & ~0xF0000000;
+        if (address1 < FB_MAX) {
+            unsigned int y1 = (address1 * 8) / width;
+            unsigned int x1 = (address1 * 8) % width;
+            update_dirty_rectangle(x1, y1);
+            dirty = true;
         }
-        unsigned int x = (address * 8) % width;
-        dirty = true;
-        update_dirty_rectangle(x, y);
+
+        uint32_t address2 = address1 + 3;
+        if (address2 < FB_MAX) {
+            unsigned int y2 = (address2 * 8) / width;
+            unsigned int x2 = (address2 * 8) % width;
+            update_dirty_rectangle(x2, y2);
+            dirty = true;
+        }
     }
 
 private:

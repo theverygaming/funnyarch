@@ -18,8 +18,8 @@ mtsr pcst, r0
 mov r0, entry
 or r0, r0, #0x1 // no jump table
 mtsr ibptr, r0
-push(lr)
 mov rsp, #0x2100
+push(lr)
 mov r0, #0x5C // '\'
 rcall(write_serial)
 mov r0, #0x0A // newline

@@ -231,7 +231,11 @@ static inline void main_loop() {
 
     uint64_t waited = sdl_ctx.wait_for_next_frame();
 
+#ifdef SDLCLASS_USE_IMGUI
     if (wait_time_buf.add_val(waited) && !debugger_enabled) {
+#else
+    if (wait_time_buf.add_val(waited)) {
+#endif
         uint64_t scale = instr_count / 2;
         scale = scale == 0 ? 1 : scale;
         if (wait_time_buf.get_avg() >= 2) {
