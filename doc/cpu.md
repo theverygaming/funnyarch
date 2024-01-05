@@ -1,3 +1,5 @@
+# CPU
+
 ## Registers
 
 | number | bits | name | description                     |
@@ -69,7 +71,7 @@
 There are 256 different interrupt numbers.
 On interrupt the CPU saves `rip` (pointing to the _next_ instruction in case of an interrupt and to the _current_ instruction in case of an exception) in `irip`, then the interrupt number will be set in `pcst` and the usermode bit will be unset.
 If the lowest bit of `ibptr` the CPU will now jump to the address in (`ibptr` & 0xFFFFFFFC).
-If the bit is not set the CPU will jump to ((`ibptr` & 0xFFFFFFFC) + (4*interrupt number)).
+If the bit is not set the CPU will jump to ((`ibptr` & 0xFFFFFFFC) + (4\*interrupt number)).
 
 | number | type                        | description      |
 | ------ | --------------------------- | ---------------- |
@@ -84,16 +86,16 @@ All instructions are 32 bits in length. They can all be executed conditionally
 
 ### Condition codes
 
-| value | name         | operation    | operation                                        |
-| ----- | ------------ | ------------ | ------------------------------------------------ |
-| 0     | always       | unconditinal | always execute                                   |
-| 1     | ifz/ifeq     | tgt == src   | execute if zero flag is set                      |
-| 2     | ifnz/ifneq   | tgt != src   | execute if zero flag is not set                  |
-| 3     | ifc/iflt     | tgt < src    | execute if carry flag is set                     |
-| 4     | ifnc/ifgteq  | tgt >= src   | execute if carry flag is not set                 |
-| 5     | ifnzc/ifgt   | tgt > src    | execute if both carry and zero flags are not set |
-| 6     | ifzoc/iflteq | tgt <= src   | execute if zero flag or carry flag is set        |
-| 7     | always       | unconditinal | always execute (this may change in the future!!) |
+| value | name         | operation     | operation                                        |
+| ----- | ------------ | ------------- | ------------------------------------------------ |
+| 0     | always       | unconditional | always execute                                   |
+| 1     | ifz/ifeq     | tgt == src    | execute if zero flag is set                      |
+| 2     | ifnz/ifneq   | tgt != src    | execute if zero flag is not set                  |
+| 3     | ifc/iflt     | tgt < src     | execute if carry flag is set                     |
+| 4     | ifnc/ifgteq  | tgt >= src    | execute if carry flag is not set                 |
+| 5     | ifnzc/ifgt   | tgt > src     | execute if both carry and zero flags are not set |
+| 6     | ifzoc/iflteq | tgt <= src    | execute if zero flag or carry flag is set        |
+| 7     | reserved     | reserved      | reserved                                         |
 
 ### E1
 
