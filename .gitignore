@@ -28,3 +28,4 @@ __pycache__/
 /emulator/emu.html
 /emulator/emu.js
 /emulator/emu.wasm
+/node_modules
