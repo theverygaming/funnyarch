@@ -52,10 +52,7 @@ public:
         if (sdl_fb_texture == nullptr) {
             SDL_Log("Error creating texture: %s", SDL_GetError());
         }
-        sdl_fb_surface = SDL_CreateRGBSurface(0, width, height, 32, 0x00FF0000, 0x0000FF00, 0x000000FF, 0xFF000000);
-        if (sdl_fb_surface == nullptr) {
-            SDL_Log("Error creating surface: %s", SDL_GetError());
-        }
+
 #ifdef SDLCLASS_USE_IMGUI
         imgui_init();
 #endif
@@ -64,6 +61,13 @@ public:
     void set_buf(void *buf, size_t buf_size) {
         _buf = buf;
         _buf_size = buf_size;
+
+        sdl_fb_surface = SDL_CreateRGBSurfaceWithFormatFrom(_buf, width, height, 1, width / 8, SDL_PIXELFORMAT_INDEX1LSB);
+        static SDL_Color colors[2] = {{0, 0, 0, 255}, {255, 255, 255, 255}};
+        SDL_SetPaletteColors(sdl_fb_surface->format->palette, colors, 0, 2);
+        if (sdl_fb_surface == nullptr) {
+            SDL_Log("Error creating surface: %s", SDL_GetError());
+        }
     }
 #ifdef SDLCLASS_USE_IMGUI
     void set_imgui_render_func(void (*render)()) {
@@ -93,31 +97,14 @@ public:
 #endif
 
         if (dirty) {
-            SDL_LockTexture(sdl_fb_texture, NULL, &sdl_fb_surface->pixels, &sdl_fb_surface->pitch);
-            for (size_t y = dirty_y1; y <= dirty_y2; y++) {
-                for (size_t x = dirty_x1; x <= dirty_x2; x += 8) {
-                    size_t idx = ((uint64_t)(y * width) + x) / 8;
-                    if (idx >= _buf_size) {
-                        break;
-                    }
-                    uint8_t byte = ((uint8_t *)_buf)[idx];
-                    for (unsigned int i = 0; i < 8; i++) {
-                        unsigned int xpos = x + i;
-                        unsigned int ypos = y + (xpos / width);
-                        xpos %= width;
-                        if (ypos >= height) {
-                            break;
-                        }
-                        put_pixel_bw(sdl_fb_surface, xpos, ypos, (byte & (1 << i)) != 0);
-                    }
-                }
-            }
+            SDL_DestroyTexture(sdl_fb_texture);
+            sdl_fb_texture = SDL_CreateTextureFromSurface(sdl_renderer, sdl_fb_surface);
+
             dirty = false;
-            reset_dirty_rectangle();
-            SDL_UnlockTexture(sdl_fb_texture);
         }
 
         SDL_RenderCopy(sdl_renderer, sdl_fb_texture, nullptr, nullptr);
+
 #ifdef SDLCLASS_USE_IMGUI
         imgui_end_render();
 #endif
@@ -144,27 +131,10 @@ public:
     }
 
     inline void mem_write(uint32_t _address, uint32_t value) {
-        if (_address < 0xF0000000) {
+        if ((_address < 0xF0000000) || (_address >= (0xF0000000 + ((width * height) / 8)))) {
             return;
         }
-
-        const uint32_t FB_MAX = (width * height) / 8;
-
-        uint32_t address1 = _address & ~0xF0000000;
-        if (address1 < FB_MAX) {
-            unsigned int y1 = (address1 * 8) / width;
-            unsigned int x1 = (address1 * 8) % width;
-            update_dirty_rectangle(x1, y1);
-            dirty = true;
-        }
-
-        uint32_t address2 = address1 + 3;
-        if (address2 < FB_MAX) {
-            unsigned int y2 = (address2 * 8) / width;
-            unsigned int x2 = (address2 * 8) % width;
-            update_dirty_rectangle(x2, y2);
-            dirty = true;
-        }
+        dirty = true;
     }
 
 private:
@@ -183,40 +153,8 @@ private:
     unsigned int height = 480;
 
     bool dirty = true;
-    unsigned int dirty_x1 = width - 1;
-    unsigned int dirty_y1 = height - 1;
-    unsigned int dirty_x2 = 0;
-    unsigned int dirty_y2 = 0;
 
     uint64_t next_frame_end = 0;
-
-    void reset_dirty_rectangle() {
-        dirty_x1 = width - 1;
-        dirty_y1 = height - 1;
-        dirty_x2 = 0;
-        dirty_y2 = 0;
-    }
-
-    void update_dirty_rectangle(unsigned int x, unsigned int y) {
-        x = SDLCLASS_ALIGN_UP(x, 8);
-        if (x >= width) {
-            x = width - 1;
-        }
-
-        if (x < dirty_x1) {
-            dirty_x1 = x;
-        }
-        if (x > dirty_x2) {
-            dirty_x2 = x;
-        }
-
-        if (y < dirty_y1) {
-            dirty_y1 = y;
-        }
-        if (y > dirty_y2) {
-            dirty_y2 = y;
-        }
-    }
 
 #ifdef SDLCLASS_USE_IMGUI
     void imgui_init() {

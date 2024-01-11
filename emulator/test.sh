@@ -10,5 +10,5 @@ python3 ../assembler/python/assembler.py ../asm/testsuite/main.asm output.bin | 
 #./emu
 #gcov --all-blocks src/cpu.cpp
 
-make -j12
+make -j$(nproc)
 ./emu

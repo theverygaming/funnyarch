@@ -563,7 +563,6 @@ if len(sys.argv) != 3:
     print(f"usage: {sys.argv[0]} input output")
     exit(1)
 
-infile = open(sys.argv[1])
 with open(sys.argv[1]) as infile:
     try:
         infilec = preprocessor.preprocess(
