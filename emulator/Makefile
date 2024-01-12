@@ -29,6 +29,7 @@ endif
 CXXFILES = src/main.cpp \
 		   src/cpu.cpp \
 		   src/mem.cpp \
+		   src/mmio.cpp \
 		   src/imgui/imgui_demo.cpp \
 		   src/imgui/imgui_draw.cpp \
 		   src/imgui/imgui_impl_sdl2.cpp \

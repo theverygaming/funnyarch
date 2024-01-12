@@ -19,7 +19,7 @@ class SDL {
 public:
     SDL() {
         SDL_Init(SDL_INIT_VIDEO);
-        sdlwin = SDL_CreateWindow("balls", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, 0);
+        sdlwin = SDL_CreateWindow("funnyarch", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, 0);
     }
 
     bool update_events() {

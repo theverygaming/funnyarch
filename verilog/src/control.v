@@ -21,6 +21,8 @@ module control (
     `define STATE_DECODE 3'h1
     `define STATE_WRITEBACK 3'h2
     `define STATE_WAIT 3'h5
+    `define TLB_ENTRYCOUNT 128
+    `define TLB_INDEX_BITS 7
 
     // register definitions
     `define REG_LR 28
@@ -30,21 +32,70 @@ module control (
     `define SYSREG_IRIP 4
     `define SYSREG_IBPTR 5
     `define SYSREG_PCST 6
+    `define SYSREG_TLBIRIP 7
+    `define SYSREG_TLBIPTR 8
+    `define SYSREG_TLBFLT 9
 );
   `include "src/config.vh"
+
+  function void pcst_push_state_stack;
+    sysregarr[`SYSREG_PCST][11:8] <= sysregarr[`SYSREG_PCST][7:4];
+    sysregarr[`SYSREG_PCST][7:4]  <= sysregarr[`SYSREG_PCST][3:0];
+  endfunction
+
+  function void pcst_pop_state_stack;
+    sysregarr[`SYSREG_PCST][3:0] <= sysregarr[`SYSREG_PCST][7:4];
+    sysregarr[`SYSREG_PCST][7:4] <= sysregarr[`SYSREG_PCST][11:8];
+  endfunction
 
   function void interrupt;
     input reg [7:0] intnum;
     input reg exception;
-    begin
-      sysregarr[`SYSREG_IRIP] <= (exception == 1) ? (regarr[`REG_RIP] - 4) : regarr[`REG_RIP];
-      sysregarr[`SYSREG_PCST][31:24] <= intnum;
-      sysregarr[`SYSREG_PCST][1] <= 0; // unset usermode
-      if (sysregarr[`SYSREG_IBPTR][0] != 0)
-        regarr[`REG_RIP] <= {sysregarr[`SYSREG_IBPTR][31:2], 2'h0};
-      else regarr[`REG_RIP] <= {sysregarr[`SYSREG_IBPTR][31:2], 2'h0} + {22'h0, intnum, 2'h0};
-      state <= `STATE_FETCH;
-    end
+    pcst_push_state_stack();
+    sysregarr[`SYSREG_IRIP] <= (exception == 1) ? (regarr[`REG_RIP] - 4) : regarr[`REG_RIP];
+    sysregarr[`SYSREG_PCST][31:24] <= intnum;
+    sysregarr[`SYSREG_PCST][1] <= 0;  // unset usermode
+    sysregarr[`SYSREG_PCST][3] <= 0;  // unset enable hardware interrupts
+    if (sysregarr[`SYSREG_IBPTR][0] != 0)
+      regarr[`REG_RIP] <= {sysregarr[`SYSREG_IBPTR][31:2], 2'h0};
+    else regarr[`REG_RIP] <= {sysregarr[`SYSREG_IBPTR][31:2], 2'h0} + {22'h0, intnum, 2'h0};
+    state <= `STATE_FETCH;
+  endfunction
+
+  function [31:0] tlb_translate_memaddr;
+    input reg [31:0] addr;
+    tlb_translate_memaddr = (sysregarr[`SYSREG_PCST][2] == 1) ? {tlb[addr[12+((`TLB_INDEX_BITS)-1):12]][19:0], addr[11:0]} : addr;
+  endfunction
+
+  function [0:0] memaddr_in_tlb;
+    input reg [31:0] addr;
+    memaddr_in_tlb = (sysregarr[`SYSREG_PCST][2] == 1) ? (tlb[addr[12+((`TLB_INDEX_BITS)-1):12]][40] && (tlb[addr[12+((`TLB_INDEX_BITS)-1):12]][39:20] == addr[31:12])) : 1;
+  endfunction
+
+  function void do_tlbmiss;
+    input reg [31:0] addr;
+    input reg [0:0] dec_rip;
+    pcst_push_state_stack();
+    sysregarr[`SYSREG_TLBIRIP] <= (dec_rip == 1) ? (regarr[`REG_RIP] - 4) : regarr[`REG_RIP];
+    sysregarr[`SYSREG_TLBFLT] <= addr;
+    sysregarr[`SYSREG_PCST][1] <= 0;  // unset usermode
+    sysregarr[`SYSREG_PCST][2] <= 0;  // unset enable TLB
+    sysregarr[`SYSREG_PCST][3] <= 0;  // unset enable hardware interrupts
+    regarr[`REG_RIP] <= {sysregarr[`SYSREG_TLBIPTR][31:2], 2'h0};
+    state <= `STATE_FETCH;
+  endfunction
+
+  function void tlb_invalidate_addr;
+    input reg [31:0] addr;
+    tlb[addr[12+((`TLB_INDEX_BITS)-1):12]][40] <= 0;
+  endfunction
+
+  function void tlb_write_addr;
+    input reg [31:0] vaddr;
+    input reg [31:0] paddr;
+    tlb[vaddr[12+((`TLB_INDEX_BITS)-1):12]][19:0] <= paddr[31:12];
+    tlb[vaddr[12+((`TLB_INDEX_BITS)-1):12]][39:20] <= vaddr[31:12];
+    tlb[vaddr[12+((`TLB_INDEX_BITS)-1):12]][40] <= 1;
   endfunction
 
   reg [31:0] instr;
@@ -52,23 +103,29 @@ module control (
   reg [2:0] state_next;
 
   reg [31:0] regarr[31:0];
-  reg [31:0] sysregarr[6:0];
+  reg [31:0] sysregarr[9:0];
+
+  reg [40:0] tlb[(`TLB_ENTRYCOUNT)-1:0]; // [19:0] bits 12-31 of physical address, [39:20] bits 12-31 of virtual address, [40] active bit
 
   always @(posedge clk) begin
     if (reset == 1) begin
       //$display("CPU: reset");
       regarr[`REG_RIP] <= `INITIAL_RIP;
       regarr[`REG_RF] <= 32'b0;
+      sysregarr[`SYSREG_PCST] <= 32'b0;
 
       state <= `STATE_FETCH;
     end  // fetch
     else if (state == `STATE_FETCH) begin
-      //$display("CPU: fetch rip: 0x%h", {regarr[`REG_RIP][31:2], 2'b0});
-      address = {regarr[`REG_RIP][31:2], 2'b0};
       data_rw <= 0;
-      regarr[`REG_RIP] <= {regarr[`REG_RIP][31:2], 2'b0} + 4;
-      state <= `STATE_WAIT;
-      state_next <= `STATE_DECODE;
+      if (memaddr_in_tlb({regarr[`REG_RIP][31:2], 2'b0})) begin
+        address = tlb_translate_memaddr({regarr[`REG_RIP][31:2], 2'b0});
+        regarr[`REG_RIP] <= {regarr[`REG_RIP][31:2], 2'b0} + 4;
+        state <= `STATE_WAIT;
+        state_next <= `STATE_DECODE;
+      end else begin
+        do_tlbmiss({regarr[`REG_RIP][31:2], 2'b0}, 0);
+      end
     end  // decode
     else if (state == `STATE_DECODE) begin
       instr = data_in;
@@ -90,12 +147,17 @@ module control (
             if ((sysregarr[`SYSREG_PCST][0] != 0) && (((regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]}) & 32'b11) != 0)) begin
               interrupt(254, 1);
             end else begin
-              regarr[instr[18:14]] <= regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]};
-              address = regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]};
-              data_rw <= 1;
-              data_out <= regarr[instr[13:9]];
-              state <= `STATE_WAIT;
-              state_next <= `STATE_FETCH;
+              if (memaddr_in_tlb(regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]})) begin
+                regarr[instr[18:14]] <= regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]};
+                address =
+                    tlb_translate_memaddr(regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]});
+                data_out <= regarr[instr[13:9]];
+                data_rw <= 1;
+                state <= `STATE_WAIT;
+                state_next <= `STATE_FETCH;
+              end else begin
+                do_tlbmiss(regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]}, 1);
+              end
             end
           end
           6'h02: begin  /* JMP(E4) */
@@ -119,42 +181,60 @@ module control (
             if ((sysregarr[`SYSREG_PCST][0] != 0) && (((regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]}) & 32'b11) != 0)) begin
               interrupt(254, 1);
             end else begin
-              address = regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]};
-              state <= `STATE_WAIT;
-              state_next <= `STATE_WRITEBACK;
+              if (memaddr_in_tlb(regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]})) begin
+                address =
+                    tlb_translate_memaddr(regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]});
+                state <= `STATE_WAIT;
+                state_next <= `STATE_WRITEBACK;
+              end else begin
+                do_tlbmiss(regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]}, 1);
+              end
             end
           end
           6'h07: begin  /* LDRI(E2) */
             if ((sysregarr[`SYSREG_PCST][0] != 0) && (regarr[instr[13:9]][1:0] != 0)) begin
               interrupt(254, 1);
             end else begin
-              regarr[instr[13:9]] <= regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]};
-              address = regarr[instr[13:9]];
-              state <= `STATE_WAIT;
-              state_next <= `STATE_WRITEBACK;
+              if (memaddr_in_tlb(regarr[instr[13:9]])) begin
+                regarr[instr[13:9]] <= regarr[instr[13:9]] + {{20{instr[31]}}, instr[30:19]};
+                address = tlb_translate_memaddr(regarr[instr[13:9]]);
+                state <= `STATE_WAIT;
+                state_next <= `STATE_WRITEBACK;
+              end else begin
+                do_tlbmiss(regarr[instr[13:9]], 1);
+              end
             end
           end
           6'h08: begin  /* STR(E2) */
             if ((sysregarr[`SYSREG_PCST][0] != 0) && (((regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]}) & 32'b11) != 0)) begin
               interrupt(254, 1);
             end else begin
-              address = regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]};
-              data_rw <= 1;
-              data_out <= regarr[instr[13:9]];
-              state <= `STATE_WAIT;
-              state_next <= `STATE_FETCH;
+              if (memaddr_in_tlb(regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]})) begin
+                address =
+                    tlb_translate_memaddr(regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]});
+                data_rw <= 1;
+                data_out <= regarr[instr[13:9]];
+                state <= `STATE_WAIT;
+                state_next <= `STATE_FETCH;
+              end else begin
+                do_tlbmiss(regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]}, 1);
+              end
             end
           end
           6'h09: begin  /* STRI(E2) */
             if ((sysregarr[`SYSREG_PCST][0] != 0) && (regarr[instr[18:14]][1:0] != 0)) begin
               interrupt(254, 1);
             end else begin
-              regarr[instr[18:14]] <= regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]};
-              address = regarr[instr[18:14]];
-              data_rw <= 1;
-              data_out <= regarr[instr[13:9]];
-              state <= `STATE_WAIT;
-              state_next <= `STATE_FETCH;
+              if (memaddr_in_tlb(regarr[instr[18:14]])) begin
+                regarr[instr[18:14]] <= regarr[instr[18:14]] + {{20{instr[31]}}, instr[30:19]};
+                address = tlb_translate_memaddr(regarr[instr[18:14]]);
+                data_rw <= 1;
+                data_out <= regarr[instr[13:9]];
+                state <= `STATE_WAIT;
+                state_next <= `STATE_FETCH;
+              end else begin
+                do_tlbmiss(regarr[instr[18:14]], 1);
+              end
             end
           end
           6'h0a: begin  /* JAL(E4) */
@@ -324,18 +404,45 @@ module control (
             state <= `STATE_WRITEBACK;
           end
           6'h26: begin  /* MTSR(E7) MFSR(E7) */
-            if (sysregarr[`SYSREG_PCST][1] != 0) begin // instruction is not allowed in usermode
+            if (sysregarr[`SYSREG_PCST][1] != 0) begin  // instruction is not allowed in usermode
               interrupt(253, 1);
-            end else if ((instr[31:19] == 13'h1 && instr[13:9] >= 7) || (instr[31:19] == 13'h0 && instr[18:14] >= 7)) begin
+            end else if ((instr[31:19] == 13'h1 && instr[13:9] >= 10) || (instr[31:19] == 13'h0 && instr[18:14] >= 10)) begin
               interrupt(255, 1);
             end else begin
               if (instr[31:19] == 13'h1) begin  // MFSR
-                regarr[instr[18:14]] = sysregarr[instr[13:9][2:0]];
+                regarr[instr[18:14]] = sysregarr[instr[13:9][3:0]];
               end else begin  // MTSR
-                sysregarr[instr[18:14][2:0]] <= regarr[instr[13:9]];
+                sysregarr[instr[18:14][3:0]] <= regarr[instr[13:9]];
               end
               state <= `STATE_FETCH;
             end
+          end
+          6'h27: begin  /* INVLPG(E5) INVLTLB(E5) */
+            if (sysregarr[`SYSREG_PCST][1] != 0) begin  // instruction is not allowed in usermode
+              interrupt(253, 1);
+            end else if (instr[31:14] == 18'h1) begin  // INVLTLB
+              tlb   <= '{default: '0};
+              state <= `STATE_FETCH;
+            end else begin  // INVLPG
+              tlb_invalidate_addr(regarr[instr[13:9]]);
+              state <= `STATE_FETCH;
+            end
+          end
+          6'h28: begin  /* TLBW(E1) */
+            if (sysregarr[`SYSREG_PCST][1] != 0) begin  // instruction is not allowed in usermode
+              interrupt(253, 1);
+            end else begin
+              tlb_write_addr(regarr[instr[13:9]], regarr[instr[23:19]]);
+              state <= `STATE_FETCH;
+            end
+          end
+          6'h29: begin  /* IRET(E6) IRETTLB(E6) */
+            if (sysregarr[`SYSREG_PCST][1] != 0) begin  // instruction is not allowed in usermode
+              interrupt(253, 1);
+            end
+            pcst_pop_state_stack();
+            regarr[`REG_RIP] <= (instr[31:9] == 1) ? sysregarr[`SYSREG_TLBIRIP] : sysregarr[`SYSREG_IRIP]; // IRETTLB?
+            state <= `STATE_FETCH;
           end
           default: begin  /* invalid opcode */
             interrupt(255, 1);

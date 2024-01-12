@@ -218,6 +218,9 @@ static inline void main_loop() {
         return;
     }
     sdl_ctx.redraw();
+    if (!debugger_enabled) {
+        cpu::hwinterrupt(&cpu_ctx, 0);
+    }
 
 #ifdef SDLCLASS_USE_IMGUI
     auto tnow = std::chrono::high_resolution_clock::now();

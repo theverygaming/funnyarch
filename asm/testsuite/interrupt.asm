@@ -22,6 +22,7 @@ shr r0, r0, #24 // interrupt number in r0
 cmp r0, #254
 ifeq mfsr r0, pcst
 ifeq xor r0, #0b1 // unset alignment flag
+ifeq xor r0, #0b10000 // unset old alignment flag
 ifeq mtsr pcst, r0
 ifeq rjmp .int_handler_p1
 
@@ -51,7 +52,7 @@ pop(r2)
 pop(r1)
 pop(r0)
 pop(lr)
-mfsr rip, irip
+iret
 
 defstr(str_gotint, "hello from interrupt handler!")
 defstr(str_alignerr, "alignment error")

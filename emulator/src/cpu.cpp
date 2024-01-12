@@ -1,6 +1,6 @@
 #include "cpu.h"
-#include <stdio.h>
-#include <string.h>
+#include <cstdio>
+#include <cstring>
 
 #define CPU_FORCEINLINE __attribute__((always_inline))
 
@@ -32,18 +32,77 @@ void cpu::init(struct cpu::ctx *ctx) {
 
 void cpu::reset(struct cpu::ctx *ctx) {
     memset(ctx->regs, 0, sizeof(ctx->regs));
+    memset(ctx->sysregs, 0, sizeof(ctx->sysregs));
+}
+
+static inline CPU_FORCEINLINE void pcst_push_state_stack(struct cpu::ctx *ctx) {
+    ctx->sysregs[CPU_SYSREG_PCST] = (ctx->sysregs[CPU_SYSREG_PCST] & 0xFFFFF000) | ((ctx->sysregs[CPU_SYSREG_PCST] & 0xF0) << 4) |
+                                    ((ctx->sysregs[CPU_SYSREG_PCST] & 0xF) << 4) | (ctx->sysregs[CPU_SYSREG_PCST] & 0xF);
+}
+
+static inline CPU_FORCEINLINE void pcst_pop_state_stack(struct cpu::ctx *ctx) {
+    ctx->sysregs[CPU_SYSREG_PCST] = (ctx->sysregs[CPU_SYSREG_PCST] & 0xFFFFF000) | (ctx->sysregs[CPU_SYSREG_PCST] & 0xF00) |
+                                    ((ctx->sysregs[CPU_SYSREG_PCST] & 0xF00) >> 4) | ((ctx->sysregs[CPU_SYSREG_PCST] & 0xF0) >> 4);
+}
+
+static inline CPU_FORCEINLINE uint32_t tlb_translate_memaddr(struct cpu::ctx *ctx, uint32_t addr) {
+    return ((ctx->sysregs[CPU_SYSREG_PCST] & 0b100) != 0) ? (((ctx->tlb[(addr >> 12) & CPU_TLB_INDEX_BITS_MASK] & 0xFFFFF) << 12) | (addr & 0xFFF))
+                                                          : addr;
+}
+
+static inline CPU_FORCEINLINE bool memaddr_in_tlb(struct cpu::ctx *ctx, uint32_t addr) {
+    if ((ctx->sysregs[CPU_SYSREG_PCST] & 0b100) != 0) {
+        uint64_t tlbent = ctx->tlb[(addr >> 12) & CPU_TLB_INDEX_BITS_MASK];
+        if (((tlbent & (1ull << 40)) != 0) && (((tlbent & (0xFFFFFull << 20)) >> 20) == (addr >> 12))) {
+            return true;
+        }
+        return false;
+    }
+    return true;
+}
+
+static inline CPU_FORCEINLINE void tlb_invalidate_addr(struct cpu::ctx *ctx, uint32_t addr) {
+    ctx->tlb[(addr >> 12) & CPU_TLB_INDEX_BITS_MASK] = ctx->tlb[(addr >> 12) & CPU_TLB_INDEX_BITS_MASK] & ~(1ull << 40);
+}
+
+static inline CPU_FORCEINLINE void tlb_write_addr(struct cpu::ctx *ctx, uint32_t vaddr, uint32_t paddr) {
+    vaddr >>= 12;
+    paddr >>= 12;
+    ctx->tlb[vaddr & CPU_TLB_INDEX_BITS_MASK] = paddr | ((uint64_t)vaddr << 20) | (1ull << 40);
+}
+
+static inline CPU_FORCEINLINE void do_tlbmiss(struct cpu::ctx *ctx, uint32_t addr, bool dec_rip) {
+    pcst_push_state_stack(ctx);
+    // save rip
+    ctx->sysregs[CPU_SYSREG_TLBIRIP] = dec_rip ? (ctx->regs[CPU_REG_RIP] - 4) : ctx->regs[CPU_REG_RIP];
+    ctx->sysregs[CPU_SYSREG_TLBFLT] = addr;
+    // unset usermode, TLB and hardware interrupt bits
+    ctx->sysregs[CPU_SYSREG_PCST] = ctx->sysregs[CPU_SYSREG_PCST] & ~0b1110ul;
+    // jump
+    ctx->regs[CPU_REG_RIP] = ctx->sysregs[CPU_SYSREG_TLBIPTR] & 0xFFFFFFFC;
 }
 
 static inline CPU_FORCEINLINE uint32_t interrupt(struct cpu::ctx *ctx, uint8_t n) {
+    pcst_push_state_stack(ctx);
     // save rip
     ctx->sysregs[CPU_SYSREG_IRIP] = ctx->regs[CPU_REG_RIP];
     // set interrupt number in pcst
     bitset(&ctx->sysregs[CPU_SYSREG_PCST], 24, 8, (uint32_t)n);
-    // unset usermode bit
-    ctx->sysregs[CPU_SYSREG_PCST] = ctx->sysregs[CPU_SYSREG_PCST] & ~0b10ul;
+    // unset usermode and hardware interrupt bits
+    ctx->sysregs[CPU_SYSREG_PCST] = ctx->sysregs[CPU_SYSREG_PCST] & ~0b1010ul;
     // jump
     ctx->regs[CPU_REG_RIP] = (ctx->sysregs[CPU_SYSREG_IBPTR] & 0xFFFFFFFC) + (((ctx->sysregs[CPU_SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * (uint32_t)n));
     return 4; // interrupt takes four cycles // FIXME: wrongwrongwrong!
+}
+
+void cpu::hwinterrupt(struct cpu::ctx *ctx, uint8_t n) {
+    if (n > 253) {
+        return;
+    }
+    // check hardware interrupt CPU flag
+    if ((ctx->sysregs[CPU_SYSREG_PCST] & 0b1000) != 0) {
+        interrupt(ctx, n);
+    }
 }
 
 static inline CPU_FORCEINLINE bool shouldexecute(struct cpu::ctx *ctx, unsigned int condition) {
@@ -141,10 +200,18 @@ union enc_7 {
 uint32_t cpu::execute(struct cpu::ctx *ctx, uint32_t instrs) {
     uint32_t clock_cycles = 0;
 begin:
-    uint32_t instr = cpu::mem_read(ctx, ctx->regs[CPU_REG_RIP] & 0xFFFFFFFC);
+    uint32_t instr;
+    uint8_t opcode;
+    uint8_t cond;
+    if (memaddr_in_tlb(ctx, ctx->regs[CPU_REG_RIP] & 0xFFFFFFFC)) {
+        instr = cpu::mem_read(ctx, tlb_translate_memaddr(ctx, ctx->regs[CPU_REG_RIP] & 0xFFFFFFFC));
+    } else {
+        do_tlbmiss(ctx, ctx->regs[CPU_REG_RIP] & 0xFFFFFFFC, false);
+        goto finish;
+    }
     ctx->regs[CPU_REG_RIP] += 4;
-    uint8_t opcode = instr & 0x3F;
-    uint8_t cond = (instr >> 6) & 0x07;
+    opcode = instr & 0x3F;
+    cond = (instr >> 6) & 0x07;
 
     if (!shouldexecute(ctx, cond)) {
         DEBUG_PRINTF("SKIPPING ");
@@ -170,8 +237,13 @@ begin:
             clock_cycles += interrupt(ctx, 254);
             break;
         }
-        ctx->regs[e.str.tgt] += e.str.imm13;
-        cpu::mem_write(ctx, ctx->regs[e.str.tgt], ctx->regs[e.str.src]);
+        if (memaddr_in_tlb(ctx, ctx->regs[e.str.tgt] + e.str.imm13)) {
+            ctx->regs[e.str.tgt] += e.str.imm13;
+            cpu::mem_write(ctx, tlb_translate_memaddr(ctx, ctx->regs[e.str.tgt]), ctx->regs[e.str.src]);
+        } else {
+            do_tlbmiss(ctx, ctx->regs[e.str.tgt] + e.str.imm13, true);
+            break;
+        }
         clock_cycles += 4;
         break;
     }
@@ -221,7 +293,12 @@ begin:
             clock_cycles += interrupt(ctx, 254);
             break;
         }
-        ctx->regs[e.str.tgt] = cpu::mem_read(ctx, ctx->regs[e.str.src] + e.str.imm13);
+        if (memaddr_in_tlb(ctx, ctx->regs[e.str.src] + e.str.imm13)) {
+            ctx->regs[e.str.tgt] = cpu::mem_read(ctx, tlb_translate_memaddr(ctx, ctx->regs[e.str.src] + e.str.imm13));
+        } else {
+            do_tlbmiss(ctx, ctx->regs[e.str.src] + e.str.imm13, true);
+            break;
+        }
         clock_cycles += 5;
         break;
     }
@@ -235,7 +312,12 @@ begin:
             clock_cycles += interrupt(ctx, 254);
             break;
         }
-        ctx->regs[e.str.tgt] = cpu::mem_read(ctx, ctx->regs[e.str.src]);
+        if (memaddr_in_tlb(ctx, ctx->regs[e.str.src])) {
+            ctx->regs[e.str.tgt] = cpu::mem_read(ctx, tlb_translate_memaddr(ctx, ctx->regs[e.str.src]));
+        } else {
+            do_tlbmiss(ctx, ctx->regs[e.str.src], true);
+            break;
+        }
         ctx->regs[e.str.src] += e.str.imm13;
         clock_cycles += 5;
         break;
@@ -250,7 +332,12 @@ begin:
             clock_cycles += interrupt(ctx, 254);
             break;
         }
-        cpu::mem_write(ctx, ctx->regs[e.str.tgt] + e.str.imm13, ctx->regs[e.str.src]);
+        if (memaddr_in_tlb(ctx, ctx->regs[e.str.tgt] + e.str.imm13)) {
+            cpu::mem_write(ctx, tlb_translate_memaddr(ctx, ctx->regs[e.str.tgt] + e.str.imm13), ctx->regs[e.str.src]);
+        } else {
+            do_tlbmiss(ctx, ctx->regs[e.str.tgt] + e.str.imm13, true);
+            break;
+        }
         clock_cycles += 4;
         break;
     }
@@ -264,7 +351,12 @@ begin:
             clock_cycles += interrupt(ctx, 254);
             break;
         }
-        cpu::mem_write(ctx, ctx->regs[e.str.tgt], ctx->regs[e.str.src]);
+        if (memaddr_in_tlb(ctx, ctx->regs[e.str.tgt])) {
+            cpu::mem_write(ctx, tlb_translate_memaddr(ctx, ctx->regs[e.str.tgt]), ctx->regs[e.str.src]);
+        } else {
+            do_tlbmiss(ctx, ctx->regs[e.str.tgt], true);
+            break;
+        }
         ctx->regs[e.str.tgt] += e.str.imm13;
         clock_cycles += 4;
         break;
@@ -530,7 +622,7 @@ begin:
             break;
         }
         if (e.str.instr_spe == 1) { // MFSR
-            if (e.str.src >= 7) {
+            if (e.str.src >= 10) {
                 ctx->regs[CPU_REG_RIP] -= 4;
                 clock_cycles += 3;
                 clock_cycles += interrupt(ctx, 255);
@@ -538,7 +630,7 @@ begin:
             }
             ctx->regs[e.str.tgt] = ctx->sysregs[e.str.src];
         } else { // MTSR
-            if (e.str.tgt >= 7) {
+            if (e.str.tgt >= 10) {
                 ctx->regs[CPU_REG_RIP] -= 4;
                 clock_cycles += 3;
                 clock_cycles += interrupt(ctx, 255);
@@ -546,6 +638,50 @@ begin:
             }
             ctx->sysregs[e.str.tgt] = ctx->regs[e.str.src];
         }
+        clock_cycles += 3;
+        break;
+    }
+    case 0x27: { /* INVLPG(E5) INVLTLB(E5) */
+        union enc_5 e;
+        e.instr = instr;
+        if ((ctx->sysregs[CPU_SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+            ctx->regs[CPU_REG_RIP] -= 4;
+            clock_cycles += 3;
+            clock_cycles += interrupt(ctx, 253);
+            break;
+        }
+        if (e.str.instr_spe == 1) { // INVLTLB
+            memset(ctx->tlb, 0, sizeof(ctx->tlb[0]) * CPU_TLB_ENTRYCOUNT);
+        } else { // INVLPG
+            tlb_invalidate_addr(ctx, ctx->regs[e.str.tgt]);
+        }
+        clock_cycles += 3;
+        break;
+    }
+    case 0x28: { /* TLBW(E1) */
+        union enc_1 e;
+        e.instr = instr;
+        if ((ctx->sysregs[CPU_SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+            ctx->regs[CPU_REG_RIP] -= 4;
+            clock_cycles += 3;
+            clock_cycles += interrupt(ctx, 253);
+            break;
+        }
+        tlb_write_addr(ctx, ctx->regs[e.str.src1], ctx->regs[e.str.tgt]);
+        clock_cycles += 3;
+        break;
+    }
+    case 0x29: { /* IRET(E6) IRETTLB(E6) */
+        union enc_6 e;
+        e.instr = instr;
+        if ((ctx->sysregs[CPU_SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+            ctx->regs[CPU_REG_RIP] -= 4;
+            clock_cycles += 3;
+            clock_cycles += interrupt(ctx, 253);
+            break;
+        }
+        pcst_pop_state_stack(ctx);
+        ctx->regs[CPU_REG_RIP] = (e.str.instr_spe == 1) ? ctx->sysregs[CPU_SYSREG_TLBIRIP] : ctx->sysregs[CPU_SYSREG_IRIP]; // IRETTLB?
         clock_cycles += 3;
         break;
     }

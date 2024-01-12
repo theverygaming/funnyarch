@@ -94,18 +94,25 @@ function twosComplement(num, bits) {
 
 class funnyarchCPU {
     #REG_LR = 28;
-    #REG_RSP = 29;
     #REG_RIP = 30;
     #REG_RF = 31;
     #SYSREG_IRIP = 4
     #SYSREG_IBPTR = 5
     #SYSREG_PCST = 6
+    #SYSREG_TLBIRIP = 7
+    #SYSREG_TLBIPTR = 8
+    #SYSREG_TLBFLT = 9
+
+    #CPU_TLB_INDEX_BITS = 7
+    #TLB_ENTRYCOUNT = (1 << this.#CPU_TLB_INDEX_BITS) >>> 0
+    #TLB_INDEX_BITS_MASK = ((1 << this.#CPU_TLB_INDEX_BITS) - 1) >>> 0
 
     constructor(memRead, memWrite) {
         this.memRead = memRead;
         this.memWrite = memWrite;
         this.registers = new Uint32Array(32);
-        this.sysregisters = new Uint32Array(7);
+        this.sysregisters = new Uint32Array(10);
+        this.tlb = new BigUint64Array(this.#TLB_ENTRYCOUNT);
         this.reset();
     }
 
@@ -113,17 +120,70 @@ class funnyarchCPU {
         for (let i = 0; i < this.registers.length; i++) {
             this.registers[i] = 0;
         }
+        for (let i = 0; i < this.sysregisters.length; i++) {
+            this.sysregisters[i] = 0;
+        }
+    }
+
+
+    pcst_push_state_stack() {
+        this.sysregisters[this.#SYSREG_PCST] = ((this.sysregisters[this.#SYSREG_PCST] & 0xFFFFF000) >>> 0) | ((this.sysregisters[this.#SYSREG_PCST] & 0xF0) << 4) |
+            ((this.sysregisters[this.#SYSREG_PCST] & 0xF) << 4) | (this.sysregisters[this.#SYSREG_PCST] & 0xF);
+    }
+
+    pcst_pop_state_stack() {
+        this.sysregisters[this.#SYSREG_PCST] = ((this.sysregisters[this.#SYSREG_PCST] & 0xFFFFF000) >>> 0) | (this.sysregisters[this.#SYSREG_PCST] & 0xF00) |
+            ((this.sysregisters[this.#SYSREG_PCST] & 0xF00) >>> 4) | ((this.sysregisters[this.#SYSREG_PCST] & 0xF0) >>> 4);
+    }
+
+    tlb_translate_memaddr(addr) {
+        return ((this.sysregisters[this.#SYSREG_PCST] & 0b100) != 0) ? Number(((this.tlb[((addr >>> 12) & this.#TLB_INDEX_BITS_MASK) >>> 0] & BigInt(0xFFFFF)) << BigInt(12)) | (BigInt(addr) & BigInt(0xFFF)))
+            : addr;
+    }
+
+    memaddr_in_tlb(addr) {
+        if ((this.sysregisters[this.#SYSREG_PCST] & 0b100) != 0) {
+            const tlbent = this.tlb[((addr >>> 12) & this.#TLB_INDEX_BITS_MASK) >>> 0];
+            if (((tlbent & (BigInt(1) << BigInt(40))) != 0) && (((tlbent & (BigInt(0xFFFFF) << BigInt(20))) >> BigInt(20)) == (addr >>> 12))) {
+                return true;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    tlb_invalidate_addr(addr) {
+        this.tlb[((addr >>> 12) & this.#TLB_INDEX_BITS_MASK) >>> 0] = this.tlb[((addr >>> 12) & this.#TLB_INDEX_BITS_MASK) >>> 0] & ~((BigInt(1) << BigInt(40)));
+    }
+
+    tlb_write_addr(vaddr, paddr) {
+        vaddr >>>= 12;
+        paddr >>>= 12;
+        this.tlb[vaddr & this.#TLB_INDEX_BITS_MASK] = BigInt(paddr) | (BigInt(vaddr) << BigInt(20)) | (BigInt(1) << BigInt(40));
+        console.log(`vaddr ${vaddr.toString(16)} -> paddr ${vaddr.toString(16)} ... ${this.tlb[vaddr & this.#TLB_INDEX_BITS_MASK].toString(16)}`)
+    }
+
+    do_tlbmiss(addr, dec_rip) {
+        this.pcst_push_state_stack();
+        // save rip
+        this.sysregisters[this.#SYSREG_TLBIRIP] = dec_rip ? (this.registers[this.#REG_RIP] - 4) : this.registers[this.#REG_RIP];
+        this.sysregisters[this.#SYSREG_TLBFLT] = addr;
+        // unset usermode, TLB and hardware interrupt bits
+        this.sysregisters[this.#SYSREG_PCST] = this.sysregisters[this.#SYSREG_PCST] & ~0b1110;
+        // jump
+        this.registers[this.#REG_RIP] = (this.sysregisters[this.#SYSREG_TLBIPTR] & 0xFFFFFFFC) >>> 0;
     }
 
     interrupt(n) {
+        this.pcst_push_state_stack();
         // save rip
         this.sysregisters[this.#SYSREG_IRIP] = this.registers[this.#REG_RIP];
         // set interrupt number in pcst
         this.sysregisters[this.#SYSREG_PCST] = ((this.sysregisters[this.#SYSREG_PCST] & 0x00FFFFFF) | (n & 0xFF) << 24) >>> 0;
-        // unset usermode bit
-        this.sysregisters[this.#SYSREG_PCST] = this.sysregisters[this.#SYSREG_PCST] & ~0b10;
+        // unset usermode and hardware interrupt bits
+        this.sysregisters[this.#SYSREG_PCST] = this.sysregisters[this.#SYSREG_PCST] & ~0b1010;
         // jump
-        this.registers[this.#REG_RIP] = ((this.sysregisters[this.#SYSREG_IBPTR] & 0xFFFFFFFC) + (((this.sysregisters[this.#SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * n))) >>> 0;
+        this.registers[this.#REG_RIP] = (((this.sysregisters[this.#SYSREG_IBPTR] & 0xFFFFFFFC) >>> 0) + (((this.sysregisters[this.#SYSREG_IBPTR] & 0b1) != 0) ? 0 : (4 * n))) >>> 0;
     }
 
     #shouldexecute(condition) {
@@ -149,7 +209,14 @@ class funnyarchCPU {
         while (ninstrs > 0) {
             ninstrs--;
 
-            let instr = this.memRead(this.registers[this.#REG_RIP]) >>> 0;
+            let instr = 0;
+            if (this.memaddr_in_tlb((this.registers[this.#REG_RIP] & 0xFFFFFFFC) >>> 0)) {
+                instr = this.memRead(this.tlb_translate_memaddr((this.registers[this.#REG_RIP] & 0xFFFFFFFC) >>> 0)) >>> 0;
+            } else {
+                this.do_tlbmiss((this.registers[this.#REG_RIP] & 0xFFFFFFFC) >>> 0, false);
+                continue;
+            }
+
             this.registers[this.#REG_RIP] += 4;
 
             let opcode = (instr & 0x3F) >>> 0;
@@ -176,8 +243,13 @@ class funnyarchCPU {
                         this.interrupt(254);
                         break;
                     }
+                    if (this.memaddr_in_tlb(this.registers[e.str.tgt] + e.str.imm13)) {
+                        this.memWrite(this.tlb_translate_memaddr(this.registers[e.str.tgt] + e.str.imm13), this.registers[e.str.src]);
+                    } else {
+                        this.do_tlbmiss(this.registers[e.str.tgt] + e.str.imm13, true);
+                        continue;
+                    }
                     this.registers[e.str.tgt] += e.str.imm13;
-                    this.memWrite(this.registers[e.str.tgt], this.registers[e.str.src]);
                     break;
                 }
 
@@ -217,7 +289,12 @@ class funnyarchCPU {
                         this.interrupt(254);
                         break;
                     }
-                    this.registers[e.str.tgt] = this.memRead(this.registers[e.str.src] + e.str.imm13);
+                    if (this.memaddr_in_tlb(this.registers[e.str.src] + e.str.imm13)) {
+                        this.registers[e.str.tgt] = this.memRead(this.tlb_translate_memaddr(this.registers[e.str.src] + e.str.imm13));
+                    } else {
+                        this.do_tlbmiss(this.registers[e.str.src] + e.str.imm13, true);
+                        continue;
+                    }
                     break;
                 }
 
@@ -229,7 +306,12 @@ class funnyarchCPU {
                         this.interrupt(254);
                         break;
                     }
-                    this.registers[e.str.tgt] = this.memRead(this.registers[e.str.src]);
+                    if (this.memaddr_in_tlb(this.registers[e.str.src])) {
+                        this.registers[e.str.tgt] = this.memRead(this.tlb_translate_memaddr(this.registers[e.str.src]));
+                    } else {
+                        this.do_tlbmiss(this.registers[e.str.src], true);
+                        continue;
+                    }
                     this.registers[e.str.src] += e.str.imm13;
                     break;
                 }
@@ -242,7 +324,12 @@ class funnyarchCPU {
                         this.interrupt(254);
                         break;
                     }
-                    this.memWrite(this.registers[e.str.tgt] + e.str.imm13, this.registers[e.str.src]);
+                    if (this.memaddr_in_tlb(this.registers[e.str.tgt] + e.str.imm13)) {
+                        this.memWrite(this.tlb_translate_memaddr(this.registers[e.str.tgt] + e.str.imm13), this.registers[e.str.src]);
+                    } else {
+                        this.do_tlbmiss(this.registers[e.str.tgt] + e.str.imm13, true);
+                        continue;
+                    }
                     break;
                 }
 
@@ -254,7 +341,12 @@ class funnyarchCPU {
                         this.interrupt(254);
                         break;
                     }
-                    this.memWrite(this.registers[e.str.tgt], this.registers[e.str.src]);
+                    if (this.memaddr_in_tlb(this.registers[e.str.tgt])) {
+                        this.memWrite(this.tlb_translate_memaddr(this.registers[e.str.tgt]), this.registers[e.str.src]);
+                    } else {
+                        this.do_tlbmiss(this.registers[e.str.tgt], true);
+                        continue;
+                    }
                     this.registers[e.str.tgt] += e.str.imm13;
                     break;
                 }
@@ -456,27 +548,63 @@ class funnyarchCPU {
 
                 case 0x26: { /* MTSR(E7) MFSR(E7) */
                     let e = new funnyarchCPUInstrEncoding7(instr);
-                    e.instr = instr;
                     if ((this.sysregisters[this.#SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
                         this.registers[this.#REG_RIP] -= 4;
                         this.interrupt(253);
                         break;
                     }
                     if (e.str.instr_spe == 1) { // MFSR
-                        if (e.str.src >= 7) {
+                        if (e.str.src >= 10) {
                             this.registers[this.#REG_RIP] -= 4;
                             this.interrupt(255);
                             break;
                         }
                         this.registers[e.str.tgt] = this.sysregisters[e.str.src];
                     } else { // MTSR
-                        if (e.str.tgt >= 7) {
+                        if (e.str.tgt >= 10) {
                             this.registers[this.#REG_RIP] -= 4;
                             this.interrupt(255);
                             break;
                         }
                         this.sysregisters[e.str.tgt] = this.registers[e.str.src];
                     }
+                    break;
+                }
+                case 0x27: { /* INVLPG(E5) INVLTLB(E5) */
+                    let e = new funnyarchCPUInstrEncoding5(instr);
+                    if ((this.sysregisters[this.#SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+                        this.registers[this.#REG_RIP] -= 4;
+                        this.interrupt(253);
+                        break;
+                    }
+                    if (e.str.instr_spe == 1) { // INVLTLB
+                        for (let i = 0; i < this.tlb.length; i++) {
+                            this.tlb[i] = BigInt(0);
+                        }
+                    } else { // INVLPG
+                        this.tlb_invalidate_addr(this.registers[e.str.tgt]);
+                    }
+                    break;
+                }
+                case 0x28: { /* TLBW(E1) */
+                    let e = new funnyarchCPUInstrEncoding1(instr);
+                    if ((this.sysregisters[this.#SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+                        this.registers[this.#REG_RIP] -= 4;
+                        this.interrupt(253);
+                        break;
+                    }
+                    this.tlb_write_addr(this.registers[e.str.src1], this.registers[e.str.tgt]);
+                    break;
+                }
+                case 0x29: { /* IRET(E6) IRETTLB(E6) */
+                    let e = new funnyarchCPUInstrEncoding6(instr);
+                    if ((this.sysregisters[this.#SYSREG_PCST] & 0b10) != 0) { // instruction is not allowed in usermode
+                        this.registers[this.#REG_RIP] -= 4;
+                        this.interrupt(253);
+                        break;
+                    }
+                    this.pcst_pop_state_stack();
+                    this.registers[this.#REG_RIP] = (e.str.instr_spe == 1) ? this.sysregisters[this.#SYSREG_TLBIRIP] : this.sysregisters[this.#SYSREG_IRIP]; // IRETTLB?
                     break;
                 }
 

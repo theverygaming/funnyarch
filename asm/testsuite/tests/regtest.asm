@@ -46,6 +46,7 @@ regtest_test_register(r22)
 regtest_test_register(r23)
 regtest_test_register(r24)
 regtest_test_register(r25)
+regtest_test_register(r26)
 regtest_test_register(rfp)
 regtest_test_register(lr)
 

@@ -10,6 +10,7 @@
 #include "tests/movtest.asm"
 #include "tests/regtest.asm"
 #include "tests/sysregtest.asm"
+#include "tests/tlbtest.asm"
 
 alltests:
 push(lr)
@@ -25,5 +26,6 @@ rcall(nottest)
 rcall(movtest)
 rcall(regtest)
 rcall(sysregtest)
+rcall(tlbtest)
 pop(lr)
 ret

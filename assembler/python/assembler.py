@@ -183,6 +183,21 @@ instructions = {
     ],
     "mfsr": [
         Instruction(InstructionType.E7, 0x26, instrspecific=1),
+    ],
+    "invlpg": [
+        Instruction(InstructionType.E5, 0x27),
+    ],
+    "invltlb": [
+        Instruction(InstructionType.E5, 0x27, instrspecific=1),
+    ],
+    "tlbw": [
+        Instruction(InstructionType.E1, 0x28),
+    ],
+    "iret": [
+        Instruction(InstructionType.E6, 0x29),
+    ],
+    "irettlb": [
+        Instruction(InstructionType.E6, 0x29, instrspecific=1),
     ]
 }
 
@@ -242,6 +257,9 @@ regmap = {
     "irip": 4,
     "ibptr": 5,
     "pcst": 6,
+    "tlbirip": 7,
+    "tlbiptr": 8,
+    "tlbflt": 9,
 }
 
 regmap_alias = {}
