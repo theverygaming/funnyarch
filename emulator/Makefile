@@ -30,27 +30,34 @@ CXXFILES = src/main.cpp \
 		   src/cpu.cpp \
 		   src/mem.cpp \
 		   src/mmio.cpp \
-		   src/imgui/imgui_demo.cpp \
-		   src/imgui/imgui_draw.cpp \
-		   src/imgui/imgui_impl_sdl2.cpp \
-		   src/imgui/imgui_impl_sdlrenderer2.cpp \
-		   src/imgui/imgui_tables.cpp \
-		   src/imgui/imgui_widgets.cpp \
-		   src/imgui/imgui.cpp
+		   src/components/component.cpp \
+		   src/components/hdd/hdd.cpp \
+		   src/components/serial/serial.cpp
 
+IMGUI_CXXFILES = src/imgui/imgui_demo.cpp \
+				 src/imgui/imgui_draw.cpp \
+				 src/imgui/imgui_impl_sdl2.cpp \
+				 src/imgui/imgui_impl_sdlrenderer2.cpp \
+				 src/imgui/imgui_tables.cpp \
+				 src/imgui/imgui_widgets.cpp \
+				 src/imgui/imgui.cpp
 
 OBJS = $(addsuffix .o, $(basename $(CXXFILES)))
+OBJS_IMGUI = $(addsuffix .o, $(basename $(IMGUI_CXXFILES)))
 
 .PHONY: all
 all: emu$(TARGET_FILE_EXTENSION)
 
-emu$(TARGET_FILE_EXTENSION): $(TARGET_EXTRADEPS) $(OBJS)
-	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
+emu$(TARGET_FILE_EXTENSION): $(TARGET_EXTRADEPS) $(OBJS) $(OBJS_IMGUI)
+	$(CXX) -o $@ $(OBJS) $(OBJS_IMGUI) $(LDFLAGS)
 
 %.o: %.cpp
-	$(CXX) -o $@ -c $< $(CXXFLAGS)
+	$(CXX) -I src/ -o $@ -c $< $(CXXFLAGS)
 
 clean:
 	rm -f emu
 	rm -f emu.data emu.html emu.js emu.wasm
 	rm -f $(OBJS)
+
+fullclean: clean
+	rm -f $(OBJS_IMGUI)

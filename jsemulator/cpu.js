@@ -160,7 +160,6 @@ class funnyarchCPU {
         vaddr >>>= 12;
         paddr >>>= 12;
         this.tlb[vaddr & this.#TLB_INDEX_BITS_MASK] = BigInt(paddr) | (BigInt(vaddr) << BigInt(20)) | (BigInt(1) << BigInt(40));
-        console.log(`vaddr ${vaddr.toString(16)} -> paddr ${vaddr.toString(16)} ... ${this.tlb[vaddr & this.#TLB_INDEX_BITS_MASK].toString(16)}`)
     }
 
     do_tlbmiss(addr, dec_rip) {

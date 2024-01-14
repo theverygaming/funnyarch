@@ -112,7 +112,12 @@ void imgui_debug_window() {
     if (ImGui::CollapsingHeader("Registers")) {
         ImGui::Text("Registers: ");
         for (int i = 0; i < 32; i++) {
-            ImGui::BulletText("%s: 0x%x\n", cpudesc::regnames[i], cpu_ctx.regs[i]);
+            if (!debugger_enabled) {
+                ImGui::BulletText("%s: 0x%x\n", cpudesc::regnames[i], cpu_ctx.regs[i]);
+            } else {
+                ImGui::InputScalar(
+                    cpudesc::regnames[i], ImGuiDataType_U32, &cpu_ctx.regs[i], NULL, NULL, "%08X", ImGuiInputTextFlags_CharsHexadecimal);
+            }
         }
     }
 

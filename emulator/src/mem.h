@@ -21,25 +21,25 @@ namespace mem {
     extern uint8_t *mem_fb;
 
     template <typename T> inline T read(uint32_t addr) {
-        if (addr < (RAM_BASE + (RAM_BYTES - 4)) && addr >= RAM_BASE) {
+        if (addr <= (RAM_BASE + (RAM_BYTES - 4)) && addr >= RAM_BASE) {
             return *(uint32_t *)&mem_ram[addr - RAM_BASE]; // TODO: endianness
         }
-        if (addr < (FB_BASE + (FB_BYTES - 4)) && addr >= FB_BASE) {
+        if (addr <= (FB_BASE + (FB_BYTES - 4)) && addr >= FB_BASE) {
             return *(uint32_t *)&mem_fb[addr - FB_BASE]; // TODO: endianness
         }
-        if (addr < (ROM_BASE + (ROM_BYTES - 4)) && addr >= ROM_BASE) {
+        if (addr <= (ROM_BASE + (ROM_BYTES - 4)) && addr >= ROM_BASE) {
             return *((uint32_t *)&mem_rom[addr - ROM_BASE]); // TODO: endianness
         }
-        return mmio::read(addr);
+        return mmio::mread(addr);
     }
 
     template <typename T> inline void write(uint32_t addr, T value) {
-        if (addr < (RAM_BASE + (RAM_BYTES - 4)) && addr >= RAM_BASE) {
+        if (addr <= (RAM_BASE + (RAM_BYTES - 4)) && addr >= RAM_BASE) {
             *(uint32_t *)&mem_ram[addr - RAM_BASE] = value; // TODO: endianness
         }
-        if (addr < (FB_BASE + (FB_BYTES - 4)) && addr >= FB_BASE) {
+        if (addr <= (FB_BASE + (FB_BYTES - 4)) && addr >= FB_BASE) {
             *(uint32_t *)&mem_fb[addr - FB_BASE] = value; // TODO: endianness
         }
-        mmio::write(addr, value);
+        mmio::mwrite(addr, value);
     }
 }
