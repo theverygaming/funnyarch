@@ -1,0 +1,86 @@
+extern extrnfunc, extrnvar; // external symbols
+
+/*
+block comment
+*/
+
+static global var1 = 5; // global variable
+global var2 = 5; // global variable (exported symbol)
+static global var3; // global variable (automatically initialized to zero)
+global var4; // global variable (exported symbol) (automatically initialized to zero)
+
+func1(arg1, arg2, arg3) {
+    auto var = extrnfunc(arg3, arg2);
+
+    extrnvar = 5;
+
+    var += 5;
+
+    auto var2 = var;
+
+    auto somechar = 'A';
+    auto string = "string";
+
+    var = 0;
+
+    var += var + extrnvar;
+
+    if(var == 4) {
+        var = 5;
+    } else if(var == 3) {
+        var = 4;
+    } else if(var == 2) {
+        var = 3;
+    } else {
+        var = 0;
+    }
+
+    switch(extrnvar) {
+        case 1: {
+            var = 1;
+        }
+        case 2: {
+            var = 2;
+            break;
+        }
+        case 3: {
+            var = 5;
+            break;
+        }
+        case 6: {
+            var = 0;
+        }
+        default: {
+            var = 1;
+            extrnvar -= 1;
+        }
+    }
+
+    if((var == 5) && (var >= 5) && (var < 6)) {
+        var = 4;
+    }
+
+    while(var) {
+        var--;
+    }
+
+    for(var = 0; var < 100; var++) {
+
+    }
+
+    for(var = 0; 1; var++) {
+        if(var == 100) {
+            var = 105;
+            continue;
+        }
+        if(var == 200) {
+            break;
+        }
+    }
+
+    return 5;
+}
+
+func2() {
+    return func1(5, 4, 3);
+}

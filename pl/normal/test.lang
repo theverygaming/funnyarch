@@ -1,0 +1,6 @@
+static global var1 = 5; // global variable
+global var2 = 5; // global variable (exported symbol)
+static global var3; // global variable (automatically initialized to zero)
+global var4; // global variable (exported symbol) (automatically initialized to zero)
+
+global var4; // dupe (causes error)

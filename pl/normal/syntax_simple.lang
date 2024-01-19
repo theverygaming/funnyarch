@@ -1,0 +1,7 @@
+func1(arg1, arg2, arg3) {
+    return arg1 + arg2 + arg3 + 5 + arg1;
+}
+
+func2() {
+    return func1(5, 4, 3);
+}
