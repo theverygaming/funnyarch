@@ -9,12 +9,12 @@ if len(sys.argv) != 2:
 
 with open(sys.argv[1], "r") as f:
     astnodes = ast.parse(f.read()).body
-    
+
     ir = []
 
     try:
         for node in astnodes:
-            #if isinstance(node, ast.Import):
+            # if isinstance(node, ast.Import):
             #    continue
             ir += irgen.gen_ast_node(node)
     except Exception as e:
