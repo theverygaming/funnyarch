@@ -14,6 +14,6 @@ stdenv.mkDerivation {
     #(python311Packages.opencv4.override { enableGtk2 = true; })
   ];
   shellHook = ''
-    EM_CACHE=~/.emscripten_cache
+    export EM_CACHE=~/.emscripten_cache
   '';
 }

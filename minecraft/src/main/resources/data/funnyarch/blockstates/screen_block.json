@@ -1,0 +1,7 @@
+{
+    "variants": {
+        "": {
+            "model": "funnyarch:block/screen_block"
+        }
+    }
+}
