@@ -1,6 +1,5 @@
 package theverygaming.funnyarch.block;
 
-import java.util.ArrayList;
 import com.mojang.serialization.MapCodec;
 
 import net.minecraft.block.BlockRenderType;
@@ -10,7 +9,6 @@ import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
-import net.minecraft.screen.NamedScreenHandlerFactory;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
 import net.minecraft.util.hit.BlockHitResult;
@@ -19,19 +17,19 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldAccess;
 import net.minecraft.text.Text;
 
-public class ScreenBlock extends BlockWithEntity {
+public class BusCableBlock extends BlockWithEntity {
 
-    public ScreenBlock(Settings settings) {
+    public BusCableBlock(Settings settings) {
         super(settings);
     }
 
-    public MapCodec<ScreenBlock> getCodec() {
+    public MapCodec<BusCableBlock> getCodec() {
         throw new UnsupportedOperationException("getCodec is not implemented");
     }
 
     @Override
     public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
-        return new ScreenBlockEntity(pos, state);
+        return new BusCableBlockEntity(pos, state);
     }
 
     @Override
@@ -42,15 +40,15 @@ public class ScreenBlock extends BlockWithEntity {
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, Hand hand,
             BlockHitResult hit) {
-        NamedScreenHandlerFactory screenHandlerFactory = state.createScreenHandlerFactory(world, pos);
         if (!world.isClient) {
-            player.sendMessage(Text.literal("Hello, world!"), false);
-            if (screenHandlerFactory != null) {
-                player.openHandledScreen(screenHandlerFactory);
+            BlockEntity blockEntity = world.getBlockEntity(pos);
+
+            if (blockEntity instanceof BusCableBlockEntity) {
+                BusCableBlockEntity entity = (BusCableBlockEntity) blockEntity;
+                player.sendMessage(Text.literal(
+                        "Hello world from cable .. got " + Integer.toString(entity.getNConnections()) + " connections"),
+                        false);
             }
-            ScreenBlockEntity entity = (ScreenBlockEntity) world.getBlockEntity(pos);
-            int arr[] = { 1234 };
-            entity.busCableTransmit(world, new ArrayList<BlockPos>(), arr);
         }
 
         return ActionResult.SUCCESS;

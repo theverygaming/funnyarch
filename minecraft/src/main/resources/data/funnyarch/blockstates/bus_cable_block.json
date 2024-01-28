@@ -1,0 +1,7 @@
+{
+    "variants": {
+        "": {
+            "model": "funnyarch:block/bus_cable_block"
+        }
+    }
+}

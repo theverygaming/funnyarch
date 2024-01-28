@@ -13,20 +13,29 @@ import net.minecraft.screen.ScreenHandlerType;
 import net.minecraft.util.Identifier;
 
 public class Blocks {
-    public static final Identifier SCREEN_BLOCK_IDENTIFIER = new Identifier("funnyarch", "screen_block");
-    public static final Block SCREEN_BLOCK = new ScreenBlock(
-            FabricBlockSettings.create().hardness(1.5f).resistance(6.0f).requiresTool());
-    public static final BlockEntityType<ScreenBlockEntity> SCREEN_BLOCK_ENTITY = Registry.register(
-            Registries.BLOCK_ENTITY_TYPE, SCREEN_BLOCK_IDENTIFIER,
-            FabricBlockEntityTypeBuilder.create(ScreenBlockEntity::new, SCREEN_BLOCK).build(null));
-    public static final ScreenHandlerType<ScreenScreenHandler> SCREEN_SCREEN_HANDLER = new ScreenHandlerType<ScreenScreenHandler>(
-            ScreenScreenHandler::new, FeatureFlags.VANILLA_FEATURES);
+        public static final Identifier SCREEN_BLOCK_IDENTIFIER = new Identifier("funnyarch", "screen_block");
+        public static final Block SCREEN_BLOCK = new ScreenBlock(
+                        FabricBlockSettings.create().hardness(1.5f).resistance(6.0f).requiresTool());
+        public static final BlockEntityType<ScreenBlockEntity> SCREEN_BLOCK_ENTITY = Registry.register(
+                        Registries.BLOCK_ENTITY_TYPE, SCREEN_BLOCK_IDENTIFIER,
+                        FabricBlockEntityTypeBuilder.create(ScreenBlockEntity::new, SCREEN_BLOCK).build(null));
+        public static final ScreenHandlerType<ScreenScreenHandler> SCREEN_SCREEN_HANDLER = new ScreenHandlerType<ScreenScreenHandler>(
+                        ScreenScreenHandler::new, FeatureFlags.VANILLA_FEATURES);
 
-    public static void initialize() {
-        Registry.register(Registries.BLOCK, SCREEN_BLOCK_IDENTIFIER, SCREEN_BLOCK);
-        Registry.register(Registries.ITEM, SCREEN_BLOCK_IDENTIFIER,
-                new BlockItem(SCREEN_BLOCK, new FabricItemSettings()));
+        public static final Identifier BUS_CABLE_BLOCK_IDENTIFIER = new Identifier("funnyarch", "bus_cable_block");
+        public static final Block BUS_CABLE_BLOCK = new BusCableBlock(
+                        FabricBlockSettings.create().hardness(1.5f).resistance(6.0f).requiresTool());
+        public static final BlockEntityType<BusCableBlockEntity> BUS_CABLE_BLOCK_ENTITY = Registry.register(
+                        Registries.BLOCK_ENTITY_TYPE, BUS_CABLE_BLOCK_IDENTIFIER,
+                        FabricBlockEntityTypeBuilder.create(BusCableBlockEntity::new, BUS_CABLE_BLOCK).build(null));
 
-        theverygaming.funnyarch.Funnyarch.LOGGER.info("hello screen world!!!!!!!!");
-    }
+        public static void initialize() {
+                Registry.register(Registries.BLOCK, SCREEN_BLOCK_IDENTIFIER, SCREEN_BLOCK);
+                Registry.register(Registries.ITEM, SCREEN_BLOCK_IDENTIFIER,
+                                new BlockItem(SCREEN_BLOCK, new FabricItemSettings()));
+
+                Registry.register(Registries.BLOCK, BUS_CABLE_BLOCK_IDENTIFIER, BUS_CABLE_BLOCK);
+                Registry.register(Registries.ITEM, BUS_CABLE_BLOCK_IDENTIFIER,
+                                new BlockItem(BUS_CABLE_BLOCK, new FabricItemSettings()));
+        }
 }

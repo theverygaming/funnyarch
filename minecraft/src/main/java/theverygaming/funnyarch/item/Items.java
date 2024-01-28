@@ -1,6 +1,5 @@
 package theverygaming.funnyarch.item;
 
-import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.itemgroup.v1.FabricItemGroup;
 import net.minecraft.item.ItemGroup;
 import net.minecraft.item.ItemStack;
@@ -15,6 +14,7 @@ public class Items {
             .displayName(Text.translatable("itemGroup.funnyarch.main_group"))
             .entries((context, entries) -> {
                 entries.add(theverygaming.funnyarch.block.Blocks.SCREEN_BLOCK);
+                entries.add(theverygaming.funnyarch.block.Blocks.BUS_CABLE_BLOCK);
             })
             .build();
 
