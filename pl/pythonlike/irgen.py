@@ -19,10 +19,13 @@ _globalvars = {}
 _func_locals = None
 _func_is_leaf = False
 
+_vreg_counter = -1
+
 
 def gen_ast_node(node, depth=0):
     global _func_locals
     global _func_is_leaf
+    global _vreg_counter
 
     def print_d(s):
         print(f"{' ' * (depth*4)}{s}")
@@ -47,11 +50,11 @@ def gen_ast_node(node, depth=0):
             )
             if target.id in _func_locals:
                 n = _func_locals[target.id]
-                return [ir.SetLocalConst(n, node.value.value)]
             else:
                 n = len(_func_locals)
                 _func_locals[target.id] = n
-                return [ir.SetLocalConst(n, node.value.value)]
+            _vreg_counter += 1
+            return [ir.LoadLocalToReg(_vreg_counter, n), ir.SetRegImm(_vreg_counter, node.value.value), ir.SaveRegToLocal(_vreg_counter, n)]
         return []
 
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
@@ -59,7 +62,7 @@ def gen_ast_node(node, depth=0):
         _assertion(len(node.value.args) == 0, "no arguments supported")
         _assert_instance(node.value.func, ast.Name, "weird function call")
         _func_is_leaf = False
-        return [ir.FuncCall(node.value.func.id, None)]
+        return [ir.FuncCall(node.value.func.id)]
 
     if isinstance(node, ast.Return):
         _assert_instance(node.value, ast.Constant, "can only return const")
@@ -83,10 +86,6 @@ def gen_ast_node(node, depth=0):
         fbody = []
         for n in node.body:
             fbody += gen_ast_node(n, depth + 1)
-        for i, iri in enumerate(fbody):
-            # patch function call nlocals
-            if isinstance(iri, ir.FuncCall):
-                fbody[i].nlocals = len(_func_locals)
         return [ir.Function(node.name, _func_is_leaf, len(_func_locals), fbody)]
 
     _assertion(False, f"cannot generate IR for AST node {ast.dump(node)}")
