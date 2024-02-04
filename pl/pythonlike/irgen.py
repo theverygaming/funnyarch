@@ -45,16 +45,30 @@ def gen_ast_node(node, depth=0):
             _assertion(target.id not in _globalvars, "global variable already defined")
             _globalvars[target.id] = node.value.value
         else:
-            _assert_instance(
-                node.value, ast.Constant, "can only assign constant to locals"
-            )
+            _assertion(isinstance(node.value, ast.Constant) or isinstance(node.value, ast.BinOp), "unsupported local")
+            def eval_bin_op(result, op):
+                if isinstance(op, ast.Constant):
+                    return [ ir.SetRegImm(result, op.value) ]
+                _assert_instance(op, ast.BinOp, "expected BinOp")
+                global _vreg_counter
+                ops = [] # tuple[list[ir], int[vregn]]
+                for x in [op.left, op.right]:
+                    if isinstance(x, ast.Name):
+                        if x.id not in _func_locals:
+                            _assertion(False, f"undefined variable {x.id}")
+                        ops.append(([], _func_locals[x.id]))
+                        continue
+                    _vreg_counter += 1
+                    outn = _vreg_counter
+                    ops.append((eval_bin_op(outn, x), outn))
+                return ops[0][0] + ops[1][0] + [ ir.ThreeAddressInstr(result, ops[0][1], ops[1][1], ir.astOp2IrOp(op.op)) ]
             if target.id in _func_locals:
                 n = _func_locals[target.id]
             else:
-                n = len(_func_locals)
+                _vreg_counter += 1
+                n = _vreg_counter
                 _func_locals[target.id] = n
-            _vreg_counter += 1
-            return [ir.LoadLocalToReg(_vreg_counter, n), ir.SetRegImm(_vreg_counter, node.value.value), ir.SaveRegToLocal(_vreg_counter, n)]
+            return eval_bin_op(n, node.value)
         return []
 
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):

@@ -1,5 +1,23 @@
 import ir
 
+def _IrOp2COp(ir_op):
+    transl = {
+        "Operators.ADD": "+",
+        "Operators.SUB": "-",
+        "Operators.MULT": "*",
+        "Operators.DIV": "/",
+        "Operators.MOD": "%",
+        "Operators.LSHIFT": "<<",
+        "Operators.RSHIFT": ">>",
+        "Operators.OR": "|",
+        "Operators.XOR": "^",
+        "Operators.AND": "&",
+    }
+    if str(ir_op) not in transl:
+        raise Exception(f"cannot translate operator {ir_op}")
+    return transl[str(ir_op)]
+
+
 def _gen_asm_infunc(irl, func_retlbl):
     func_asm = ""
     func_used_regs = []
@@ -24,13 +42,11 @@ def _gen_asm_infunc(irl, func_retlbl):
             use_reg(instr.regn)
             write_asm(f"vreg_{instr.regn} = {instr.value};\n")
             continue
-        if isinstance(instr, ir.LoadLocalToReg):
-            use_reg(instr.regn)
-            write_asm(f"vreg_{instr.regn} = locals[{instr.localn}];\n")
-            continue
-        if isinstance(instr, ir.SaveRegToLocal):
-            use_reg(instr.regn)
-            write_asm(f"locals[{instr.localn}] = vreg_{instr.regn};\n")
+        if isinstance(instr, ir.ThreeAddressInstr):
+            use_reg(instr.result)
+            use_reg(instr.arg1)
+            use_reg(instr.arg2)
+            write_asm(f"vreg_{instr.result} = vreg_{instr.arg1} {_IrOp2COp(instr.op)} vreg_{instr.arg2};\n")
             continue
         raise Exception(f"unknown IR instruction {instr}")
     return (func_asm, func_used_regs)
@@ -59,8 +75,8 @@ def gen_assembly(irl):
         if isinstance(instr, ir.Function):
             func_retlbl = f"{instr.name}_RETURN"
             write_asm(f"uint32_t {instr.name}() {{\n")
-            if instr.nlocals != 0:
-                write_asm(f"  uint32_t locals[{instr.nlocals}];\n")
+            #if instr.nlocals != 0:
+            #    write_asm(f"  uint32_t locals[{instr.nlocals}];\n")
             func_asm, func_used_regs = _gen_asm_infunc(instr.body, func_retlbl)
             
             for reg in func_used_regs:

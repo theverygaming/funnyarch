@@ -1,3 +1,5 @@
+from enum import Enum
+
 class BaseIrObj:
     def __repr__(self):
         attrs = ""
@@ -31,19 +33,46 @@ class FuncCall(BaseIrObj):
         self.name = name
 
 
-class LoadLocalToReg(BaseIrObj):
-    def __init__(self, regn, localn):
-        self.regn = regn
-        self.localn = localn
-
-
-class SaveRegToLocal(BaseIrObj):
-    def __init__(self, regn, localn):
-        self.regn = regn
-        self.localn = localn
-
-
 class SetRegImm(BaseIrObj):
     def __init__(self, regn, value):
         self.regn = regn
         self.value = value
+
+
+class ThreeAddressInstr(BaseIrObj):
+    def __init__(self, result, arg1, arg2, op):
+        self.result = result
+        self.arg1 = arg1
+        self.arg2 = arg2
+        self.op = op
+
+
+class Operators(Enum):
+    ADD = 1
+    SUB = 2
+    MULT = 3
+    DIV = 4
+    MOD = 5
+    LSHIFT = 6
+    RSHIFT = 7
+    OR = 8
+    XOR = 9
+    AND = 10
+
+
+def astOp2IrOp(ast_op):
+    transl = {
+        "Add": Operators.ADD,
+        "Sub": Operators.SUB,
+        "Mult": Operators.MULT,
+        "Div": Operators.DIV,
+        "Mod": Operators.MOD,
+        "LShift": Operators.LSHIFT,
+        "RShift": Operators.RSHIFT,
+        "BitOr": Operators.OR,
+        "BitXor": Operators.XOR,
+        "BitAnd": Operators.AND,
+    }
+    if ast_op.__class__.__name__ not in transl:
+        raise Exception(f"cannot translate operator {ast_op}")
+    return transl[ast_op.__class__.__name__]
