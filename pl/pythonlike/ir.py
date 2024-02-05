@@ -33,6 +33,43 @@ class FuncCall(BaseIrObj):
         self.name = name
 
 
+class CompareOperators(Enum):
+    EQ = 1
+    NEQ = 2
+    LT = 3
+    LTEQ = 4
+    GT = 5
+    GTEQ = 6
+
+
+def astCmpOp2IrCmpOp(ast_op):
+    transl = {
+        "Eq": CompareOperators.EQ,
+        "NotEq": CompareOperators.NEQ,
+        "Lt": CompareOperators.LT,
+        "LtE": CompareOperators.LTEQ,
+        "Gt": CompareOperators.GT,
+        "GtE": CompareOperators.GTEQ,
+    }
+    if ast_op.__class__.__name__ not in transl:
+        raise Exception(f"cannot translate comparison operator {ast_op}")
+    return transl[ast_op.__class__.__name__]
+
+
+class Compare(BaseIrObj):
+    def __init__(self, reg1, reg2, op, lblIfTrue, lblIfFalse):
+        self.reg1 = reg1
+        self.reg2 = reg2
+        self.op = op
+        self.lblIfTrue = lblIfTrue
+        self.lblIfFalse = lblIfFalse
+
+
+class LocalLabel(BaseIrObj):
+    def __init__(self, label):
+        self.label = label
+
+
 class SetRegImm(BaseIrObj):
     def __init__(self, regn, value):
         self.regn = regn

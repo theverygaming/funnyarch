@@ -20,12 +20,14 @@ _func_locals = None
 _func_is_leaf = False
 
 _vreg_counter = -1
+_label_counter = -1
 
 
 def gen_ast_node(node, depth=0):
     global _func_locals
     global _func_is_leaf
     global _vreg_counter
+    global _label_counter
 
     def print_d(s):
         print(f"{' ' * (depth*4)}{s}")
@@ -71,6 +73,49 @@ def gen_ast_node(node, depth=0):
             return eval_bin_op(n, node.value)
         return []
 
+    if isinstance(node, ast.If):
+        print_d(f"if stmt {ast.dump(node)}")
+        _assert_instance(node.test, ast.Compare, "unsupported if statement")
+        _assertion(len(node.test.ops) == 1, "unsupported if statement")
+        _assertion(len(node.test.comparators) == 1, "unsupported if statement")
+        def load_var(op): # returns: (resultreg, [ir])
+                global _vreg_counter
+                if isinstance(op, ast.Constant):
+                    _vreg_counter += 1
+                    dstn = _vreg_counter
+                    return (dstn, [ ir.SetRegImm(dstn, op.value) ])
+                if isinstance(op, ast.Name):
+                    if op.id not in _func_locals:
+                        _assertion(False, f"undefined variable {op.id}")
+                    return (_func_locals[op.id], [])
+                else:
+                    _assertion(False, f"could not load {op}")
+
+        _label_counter += 1
+        lblIfTrue = f"L{_label_counter}"
+        _label_counter += 1
+        lblIfFalse = f"L{_label_counter}"
+        
+        cmpr1, cmpir1 = load_var(node.test.left)
+        cmpr2, cmpir2 = load_var(node.test.comparators[0])
+        
+        body = []
+        for n in node.body:
+            body += gen_ast_node(n, depth + 1)
+        orelse = []
+        for n in node.orelse:
+            orelse += gen_ast_node(n, depth + 1)
+
+        return (
+            cmpir1
+            + cmpir2
+            + [ir.Compare(cmpr1, cmpr2, ir.astCmpOp2IrCmpOp(node.test.ops[0]), lblIfTrue, lblIfFalse)]
+            + [ir.LocalLabel(lblIfTrue)]
+            + body
+            + [ir.LocalLabel(lblIfFalse)]
+            + orelse
+        )
+
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
         _assertion(len(node.value.keywords) == 0, "no keyword arguments supported")
         _assertion(len(node.value.args) == 0, "no arguments supported")
@@ -85,7 +130,7 @@ def gen_ast_node(node, depth=0):
     if (
         isinstance(node, ast.FunctionDef) and depth == 0
     ):  # TODO: better way to check depth
-        print_d(f'function definition "{node.name}" args: {ast.dump(node.args)}')
+        print_d(f'function definition "{node.name}" args: {ast.dump(node.args, indent=1)}')
         _assertion(
             len(node.args.posonlyargs) == 0
             and len(node.args.kwonlyargs) == 0
@@ -97,6 +142,7 @@ def gen_ast_node(node, depth=0):
         )
         _func_locals = {}
         _func_is_leaf = True
+        _label_counter = -1
         fbody = []
         for n in node.body:
             fbody += gen_ast_node(n, depth + 1)

@@ -17,6 +17,19 @@ def _IrOp2COp(ir_op):
         raise Exception(f"cannot translate operator {ir_op}")
     return transl[str(ir_op)]
 
+def _IrCmpOp2CCmpOp(ir_op):
+    transl = {
+        "CompareOperators.EQ": "==",
+        "CompareOperators.NEQ": "!=",
+        "CompareOperators.LT": "<",
+        "CompareOperators.LTEQ": "<=",
+        "CompareOperators.GT": ">",
+        "CompareOperators.GTEQ": ">=",
+    }
+    if str(ir_op) not in transl:
+        raise Exception(f"cannot translate operator {ir_op}")
+    return transl[str(ir_op)]
+
 
 def _gen_asm_infunc(irl, func_retlbl):
     func_asm = ""
@@ -47,6 +60,19 @@ def _gen_asm_infunc(irl, func_retlbl):
             use_reg(instr.arg1)
             use_reg(instr.arg2)
             write_asm(f"vreg_{instr.result} = vreg_{instr.arg1} {_IrOp2COp(instr.op)} vreg_{instr.arg2};\n")
+            continue
+        if isinstance(instr, ir.Compare):
+            use_reg(instr.reg1)
+            use_reg(instr.reg2)
+            write_asm(f"if (vreg_{instr.reg1} {_IrCmpOp2CCmpOp(instr.op)} vreg_{instr.reg2}) {{\n")
+            write_asm(f"goto {instr.lblIfTrue};\n", indent=1)
+            write_asm(f"}}\n")
+            write_asm(f"else {{\n")
+            write_asm(f"goto {instr.lblIfFalse};\n", indent=1)
+            write_asm(f"}}\n")
+            continue
+        if isinstance(instr, ir.LocalLabel):
+            write_asm(f"{instr.label}:\n")
             continue
         raise Exception(f"unknown IR instruction {instr}")
     return (func_asm, func_used_regs)
@@ -92,6 +118,4 @@ def gen_assembly(irl):
             continue
         raise Exception(f"unknown IR instruction {instr}")
     return asm
-
-# TODO: optimisation: FuncReturnConst do not generate rjmp if already at end of function
 
