@@ -8,6 +8,8 @@
 *.gcno
 *.gcov
 
+*.log
+
 imgui.ini
 
 /emulator/emu

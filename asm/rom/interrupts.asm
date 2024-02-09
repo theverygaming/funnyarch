@@ -38,7 +38,7 @@ mov r8, r2
 mov r0, r1
 rcall(hdd_read)
 mov r1, r8
-mov r2, #128 // 512 / 4
+mov r2, #512
 rcall(memcpy32)
 mov lr, r9
 ret

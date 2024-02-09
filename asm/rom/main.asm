@@ -49,7 +49,7 @@ pop(r0)
 
 // copy bootsector to memory
 mov r1, REG_MEMSTART
-mov r2, #128 // 512 / 4
+mov r2, #512
 rcall(memcpy32)
 
 mov rsp, #0 // stack pointer is invalid from this point on
