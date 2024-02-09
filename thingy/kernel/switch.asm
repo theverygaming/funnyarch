@@ -1,4 +1,4 @@
-// void sched_switch(struct ctx **old, struct ctx *_new);
+// void switch(struct ctx **old, struct ctx *_new);
 switch:
 push(lr)
 push(rfp)

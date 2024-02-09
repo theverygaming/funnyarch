@@ -6,8 +6,8 @@
 .byte 0x33
 rjmp _entry
 
-#include "macros.asm"
-#include "callconv.asm"
+#include "../common/macros.asm"
+#include "../common/callconv.asm"
 #include "switch.asm"
 
 #define PROC_PTR #0x2000
@@ -17,9 +17,7 @@ shr r1, r1, #2 // r1 / 4
 add rsp, r0, r1 // rsp = top of memory
 
 // set up stack for second process
-mov r0, y.rel
-add r0, rip, r0
-sub r0, #4
+load_rel_addr(r0, y)
 sub rsp, #100
 push(r0)
 sub rsp, #80

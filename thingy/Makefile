@@ -1,25 +1,30 @@
+AS = python3 ../assembler/python/assembler.py
+
 .PHONY: all
 all: kernel.bin
 
 
-ASMFILES_KERNEL = $(shell find ./kernel -name '*.asm')
-
-kernel.bin: $(ASMFILES_KERNEL)
-	python3 ../assembler/python/assembler.py kernel/main.asm $@ > output_kernel.log
-	cat output_kernel.log
-
-
 rom.bin:
-	python3 ../assembler/python/assembler.py ../asm/rom/main.asm $@ > output_rom.log
+	$(AS) ../asm/rom/main.asm $@ > output_rom.log
 	cat output_rom.log
 
-run: rom.bin kernel.bin
+ASMFILES_BOOTLOADER = $(shell find ./bootloader -name '*.asm')
+bootloader.bin: $(ASMFILES_BOOTLOADER)
+	$(AS) bootloader/main.asm $@ > output_bootloader.log
+	cat output_bootloader.log
+
+ASMFILES_KERNEL = $(shell find ./kernel -name '*.asm')
+kernel.bin: $(ASMFILES_KERNEL)
+	$(AS) kernel/main.asm $@ > output_kernel.log
+	cat output_kernel.log
+
+run: rom.bin bootloader.bin
 	cp rom.bin output.bin
-	cp kernel.bin hd.bin
-	ls -lah kernel.bin
+	cp bootloader.bin hd.bin
+	ls -lah hd.bin
 	../emulator/emu
 
 clean:
 	rm -f kernel.bin rom.bin
 	rm -f hd.bin output.bin
-	rm -f output_rom.log output_kernel.log
+	rm -f output_rom.log output_kernel.log output_bootloader.log
