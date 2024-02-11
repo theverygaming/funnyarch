@@ -1,13 +1,14 @@
-import sys
 import ast
+import argparse
 import irgen
 import codegen
 
-if len(sys.argv) != 2:
-    print(f"usage: {sys.argv[0]} inputfile")
-    exit(1)
+parser = argparse.ArgumentParser(description="Weird compiler")
+parser.add_argument("infilename", metavar="input", help="input file name", type=str)
+parser.add_argument("-o", "--out", metavar="out", help="output file name", required=True, type=str)
+args = parser.parse_args()
 
-with open(sys.argv[1], "r") as f:
+with open(args.infilename, "r", encoding="utf-8") as f:
     astnodes = ast.parse(f.read()).body
 
     ir = []
@@ -20,10 +21,8 @@ with open(sys.argv[1], "r") as f:
     except Exception as e:
         print(e)
 
-    ir += irgen.gen_global_vars()
+    ir = irgen.gen_global_vars() + ir
 
-    print(f"global variables: {irgen.gen_global_vars()}")
-    print(ir)
     asm = codegen.gen_assembly(ir)
-    print("generated assembly:")
-    print(asm)
+    with open(args.out, "w", encoding="utf-8") as f:
+        f.write(asm)

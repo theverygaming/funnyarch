@@ -36,8 +36,10 @@ class FuncReturnReg(BaseIrObj):
 
 
 class FuncCall(BaseIrObj):
-    def __init__(self, name):
+    def __init__(self, name, arg_regns, return_regn = None):
         self.name = name
+        self.arg_regns = arg_regns
+        self.return_regn = return_regn
 
 
 class CompareOperators(Enum):
@@ -86,6 +88,32 @@ class SetRegImm(BaseIrObj):
     def __init__(self, regn, value):
         self.regn = regn
         self.value = value
+
+
+class SetRegGlobalPtr(BaseIrObj):
+    def __init__(self, regn, globalname):
+        self.regn = regn
+        self.globalname = globalname
+
+
+class ReadPointerReg(BaseIrObj):
+    def __init__(self, regn_ptr, regn_dst, regn_offset):
+        self.regn_ptr = regn_ptr
+        self.regn_dst = regn_dst
+        self.regn_offset = regn_offset
+
+
+class WritePointerReg(BaseIrObj):
+    def __init__(self, regn_ptr, regn_offset, regn_src):
+        self.regn_ptr = regn_ptr
+        self.regn_offset = regn_offset
+        self.regn_src = regn_src
+
+
+class CopyReg(BaseIrObj):
+    def __init__(self, regn_src, regn_dst):
+        self.regn_src = regn_src
+        self.regn_dst = regn_dst
 
 
 class ThreeAddressInstr(BaseIrObj):
