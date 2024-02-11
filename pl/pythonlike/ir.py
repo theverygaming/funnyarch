@@ -16,16 +16,23 @@ class GlobalVarDef(BaseIrObj):
 
 
 class Function(BaseIrObj):
-    def __init__(self, name, leaf, nlocals, body):
+    def __init__(self, name, leaf, nlocals, nargs, body):
         self.name = name
         self.leaf = leaf
         self.nlocals = nlocals
+        self.nargs = nargs
         self.body = body
 
 
-class FuncReturnConst(BaseIrObj):
-    def __init__(self, value):
-        self.value = value
+class SetRegFuncArg(BaseIrObj):
+    def __init__(self, regn, argn):
+        self.regn = regn
+        self.argn = argn
+
+
+class FuncReturnReg(BaseIrObj):
+    def __init__(self, regn):
+        self.regn = regn
 
 
 class FuncCall(BaseIrObj):
@@ -66,6 +73,11 @@ class Compare(BaseIrObj):
 
 
 class LocalLabel(BaseIrObj):
+    def __init__(self, label):
+        self.label = label
+
+
+class JumpLocalLabel(BaseIrObj):
     def __init__(self, label):
         self.label = label
 

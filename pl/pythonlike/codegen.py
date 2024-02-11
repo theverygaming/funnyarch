@@ -31,7 +31,7 @@ def _IrCmpOp2CCmpOp(ir_op):
     return transl[str(ir_op)]
 
 
-def _gen_asm_infunc(irl, func_retlbl):
+def _gen_asm_infunc(irl):
     func_asm = ""
     func_used_regs = []
 
@@ -45,8 +45,12 @@ def _gen_asm_infunc(irl, func_retlbl):
 
     for instr_idx, instr in enumerate(irl):
         write_asm(f"// IR: {instr}\n")
-        if isinstance(instr, ir.FuncReturnConst):
-            write_asm(f"returnval = {instr.value};\n")
+        if isinstance(instr, ir.SetRegFuncArg):
+            use_reg(instr.regn)
+            write_asm(f"vreg_{instr.regn} = arg_{instr.argn};\n")
+            continue
+        if isinstance(instr, ir.FuncReturnReg):
+            write_asm(f"return vreg_{instr.regn};\n")
             continue
         if isinstance(instr, ir.FuncCall):
             write_asm(f"{instr.name}();\n")
@@ -74,13 +78,15 @@ def _gen_asm_infunc(irl, func_retlbl):
         if isinstance(instr, ir.LocalLabel):
             write_asm(f"{instr.label}:\n")
             continue
+        if isinstance(instr, ir.JumpLocalLabel):
+            write_asm(f"goto {instr.label};\n")
+            continue
         raise Exception(f"unknown IR instruction {instr}")
     return (func_asm, func_used_regs)
 
 def gen_assembly(irl):
     asm = "#include <stdint.h>\n\n"
     func_name = None
-    func_retlbl = None
 
     def write_asm(s):
         nonlocal asm
@@ -99,22 +105,20 @@ def gen_assembly(irl):
                 )
             continue
         if isinstance(instr, ir.Function):
-            func_retlbl = f"{instr.name}_RETURN"
-            write_asm(f"uint32_t {instr.name}() {{\n")
+            args = ""
+            for n in range(instr.nargs):
+                args += f"{', ' if n != 0 else ''}uint32_t arg_{n}"
+            write_asm(f"uint32_t {instr.name}({args}) {{\n")
             #if instr.nlocals != 0:
             #    write_asm(f"  uint32_t locals[{instr.nlocals}];\n")
-            func_asm, func_used_regs = _gen_asm_infunc(instr.body, func_retlbl)
+            func_asm, func_used_regs = _gen_asm_infunc(instr.body)
             
             for reg in func_used_regs:
                 write_asm(f"  uint32_t vreg_{reg};\n")
             
-            write_asm(f"  uint32_t returnval;\n")
-            
             asm += func_asm
 
-            # return
-            write_asm(f"  {func_retlbl}:\n")
-            write_asm("  return returnval;\n}\n\n")
+            write_asm("  return -1; // return _some_ value so compiler does not complain\n}\n\n")
             continue
         raise Exception(f"unknown IR instruction {instr}")
     return asm

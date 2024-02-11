@@ -22,6 +22,9 @@ _func_is_leaf = False
 _vreg_counter = -1
 _label_counter = -1
 
+_closestLoopEscapeLabel = None
+_closestLoopContinueLabel = None
+
 
 def gen_ast_node(node, depth=0):
     global _func_locals
@@ -76,8 +79,6 @@ def gen_ast_node(node, depth=0):
     if isinstance(node, ast.If):
         print_d(f"if stmt {ast.dump(node)}")
         _assert_instance(node.test, ast.Compare, "unsupported if statement")
-        _assertion(len(node.test.ops) == 1, "unsupported if statement")
-        _assertion(len(node.test.comparators) == 1, "unsupported if statement")
         def load_var(op): # returns: (resultreg, [ir])
                 global _vreg_counter
                 if isinstance(op, ast.Constant):
@@ -95,9 +96,8 @@ def gen_ast_node(node, depth=0):
         lblIfTrue = f"L{_label_counter}"
         _label_counter += 1
         lblIfFalse = f"L{_label_counter}"
-        
-        cmpr1, cmpir1 = load_var(node.test.left)
-        cmpr2, cmpir2 = load_var(node.test.comparators[0])
+        _label_counter += 1
+        lblIfEnd = f"L{_label_counter}"
         
         body = []
         for n in node.body:
@@ -106,15 +106,82 @@ def gen_ast_node(node, depth=0):
         for n in node.orelse:
             orelse += gen_ast_node(n, depth + 1)
 
+        if isinstance(node.test, ast.Compare):
+            _assertion(len(node.test.ops) == 1, "unsupported if statement")
+            _assertion(len(node.test.comparators) == 1, "unsupported if statement")
+            cmpr1, cmpir1 = load_var(node.test.left)
+            cmpr2, cmpir2 = load_var(node.test.comparators[0])
+
+            return (
+                cmpir1
+                + cmpir2
+                + [ir.Compare(cmpr1, cmpr2, ir.astCmpOp2IrCmpOp(node.test.ops[0]), lblIfTrue, lblIfFalse)]
+                + [ir.LocalLabel(lblIfTrue)]
+                + body
+                + [ir.JumpLocalLabel(lblIfEnd)]
+                + [ir.LocalLabel(lblIfFalse)]
+                + orelse
+                + [ir.LocalLabel(lblIfEnd)]
+            )
+    
+    if isinstance(node, ast.While):
+        print_d(f"while loop {ast.dump(node)}")
+        _assert_instance(node.test, ast.Compare, "unsupported while loop")
+        _assertion(len(node.orelse) == 0, "unsupported while loop")
+        
+        def load_var(op): # returns: (resultreg, [ir])
+            global _vreg_counter
+            if isinstance(op, ast.Constant):
+                _vreg_counter += 1
+                dstn = _vreg_counter
+                return (dstn, [ ir.SetRegImm(dstn, op.value) ])
+            if isinstance(op, ast.Name):
+                if op.id not in _func_locals:
+                    _assertion(False, f"undefined variable {op.id}")
+                return (_func_locals[op.id], [])
+            else:
+                _assertion(False, f"could not load {op}")
+
+        _label_counter += 1
+        lblLoopStart = f"L{_label_counter}"
+        _label_counter += 1
+        lblLoopBody = f"L{_label_counter}"
+        _label_counter += 1
+        lblLoopEsc = f"L{_label_counter}"
+
+        global _closestLoopEscapeLabel, _closestLoopContinueLabel
+
+        _prev_closest_esc = _closestLoopEscapeLabel
+        _prev_closest_cont = _closestLoopContinueLabel
+
+        _closestLoopEscapeLabel = lblLoopEsc
+        _closestLoopContinueLabel = lblLoopStart
+
+        body = []
+        for n in node.body:
+            body += gen_ast_node(n, depth + 1)
+
+        _closestLoopEscapeLabel = _prev_closest_esc
+        _closestLoopContinueLabel = _prev_closest_cont
+
+        _assertion(len(node.test.ops) == 1, "unsupported while loop")
+        _assertion(len(node.test.comparators) == 1, "unsupported while loop")
+        cmpr1, cmpir1 = load_var(node.test.left)
+        cmpr2, cmpir2 = load_var(node.test.comparators[0])
+    
+
         return (
             cmpir1
             + cmpir2
-            + [ir.Compare(cmpr1, cmpr2, ir.astCmpOp2IrCmpOp(node.test.ops[0]), lblIfTrue, lblIfFalse)]
-            + [ir.LocalLabel(lblIfTrue)]
+            + [ir.LocalLabel(lblLoopStart)]
+            + [ir.Compare(cmpr1, cmpr2, ir.astCmpOp2IrCmpOp(node.test.ops[0]), lblLoopBody, lblLoopEsc)]
+            + [ir.LocalLabel(lblLoopBody)]
             + body
-            + [ir.LocalLabel(lblIfFalse)]
-            + orelse
+            + [ir.JumpLocalLabel(lblLoopStart)]
+            + [ir.LocalLabel(lblLoopEsc)]
+            #+ orelse
         )
+        
 
     if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
         _assertion(len(node.value.keywords) == 0, "no keyword arguments supported")
@@ -124,8 +191,28 @@ def gen_ast_node(node, depth=0):
         return [ir.FuncCall(node.value.func.id)]
 
     if isinstance(node, ast.Return):
-        _assert_instance(node.value, ast.Constant, "can only return const")
-        return [ir.FuncReturnConst(node.value.value)]
+        def load_var(op): # returns: (resultreg, [ir])
+            global _vreg_counter
+            if isinstance(op, ast.Constant):
+                _vreg_counter += 1
+                dstn = _vreg_counter
+                return (dstn, [ ir.SetRegImm(dstn, op.value) ])
+            if isinstance(op, ast.Name):
+                if op.id not in _func_locals:
+                    _assertion(False, f"undefined variable {op.id}")
+                return (_func_locals[op.id], [])
+            else:
+                _assertion(False, f"could not load {op}")
+        reg, regir = load_var(node.value)
+        return regir + [ir.FuncReturnReg(reg)]
+
+    if isinstance(node, ast.Break):
+        _assertion(_closestLoopEscapeLabel is not None, "invalid break")
+        return [ir.JumpLocalLabel(_closestLoopEscapeLabel)]
+
+    if isinstance(node, ast.Continue):
+        _assertion(_closestLoopContinueLabel is not None, "invalid continue")
+        return [ir.JumpLocalLabel(_closestLoopContinueLabel)]
 
     if (
         isinstance(node, ast.FunctionDef) and depth == 0
@@ -144,9 +231,15 @@ def gen_ast_node(node, depth=0):
         _func_is_leaf = True
         _label_counter = -1
         fbody = []
+        for argn, arg in enumerate(node.args.args):
+            _assertion(arg.arg not in _func_locals, "double argument")
+            _vreg_counter += 1
+            n = _vreg_counter
+            _func_locals[arg.arg] = n
+            fbody.append(ir.SetRegFuncArg(n, argn))
         for n in node.body:
             fbody += gen_ast_node(n, depth + 1)
-        return [ir.Function(node.name, _func_is_leaf, len(_func_locals), fbody)]
+        return [ir.Function(node.name, _func_is_leaf, len(_func_locals), len(node.args.args), fbody)]
 
     _assertion(False, f"cannot generate IR for AST node {ast.dump(node)}")
 

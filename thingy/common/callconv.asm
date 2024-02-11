@@ -2,7 +2,7 @@
  * calling convention:
  * caller saves r0-r7 (arguments)
  * callee saves: r8-r26, rfp, lr
- * args passed in: r0-r7 and then on stack (last argument is on top of stack)
+ * args passed in: r0-r7 and then on stack (first non-register argument is on top of stack)
  * return value in r0
  */
 
