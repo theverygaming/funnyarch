@@ -1,7 +1,6 @@
 import sys
 import ast
-import ir
-
+import ir.ir as ir
 
 def _assertion(value, error):
     if not value:

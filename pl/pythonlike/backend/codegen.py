@@ -1,5 +1,6 @@
 import json
-import ir
+import ir.ir as ir
+
 
 def _c_str_esc(s):
     toescape = {
