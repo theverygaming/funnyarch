@@ -3,5 +3,6 @@ stdenv.mkDerivation {
   name = "funnyarch";
   buildInputs = [
     python311
+    gcc
   ];
 }

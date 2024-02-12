@@ -18,6 +18,9 @@ kernel.bin: $(ASMFILES_KERNEL)
 	$(AS) kernel/main.asm $@ > output_kernel.log
 	cat output_kernel.log
 
+genfs: genfs.cpp
+	g++ -o $@ $^
+
 run: rom.bin bootloader.bin
 	cp rom.bin output.bin
 	cp bootloader.bin hd.bin
