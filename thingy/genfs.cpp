@@ -1,8 +1,10 @@
+#include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <stdexcept>
+#include <utility>
 
 // NOTE: this code only works on little-endian machines
 
@@ -19,20 +21,21 @@ struct __attribute__((packed)) inode {
     uint32_t i_block_indirect; // pointer to first indirect block
 };
 
-#define I_MODE_P_EX  (0x0001) // perms: everyone execute
-#define I_MODE_P_EW  (0x0002) // perms: everyone write
-#define I_MODE_P_ER  (0x0004) // perms: everyone read
-#define I_MODE_P_GX  (0x0008) // perms: group execute
-#define I_MODE_P_GW  (0x0010) // perms: group write
-#define I_MODE_P_GR  (0x0020) // perms: group read
-#define I_MODE_P_UX  (0x0040) // perms: user execute
-#define I_MODE_P_UW  (0x0080) // perms: user write
-#define I_MODE_P_UR  (0x0100) // perms: user read
-#define I_MODE_F_DEL (0x0200) // file type: deleted inode
-#define I_MODE_F_DIR (0x0400) // file type: directory
-#define I_MODE_F_SYM (0x0800) // file type: symlink
-#define I_MODE_F_SPE (0x1000) // file type: special file (device etc.)
-#define I_MODE_F_REL (0x2000) // file type: regular file
+#define I_MODE_P_EX       (0x0001) // perms: everyone execute
+#define I_MODE_P_EW       (0x0002) // perms: everyone write
+#define I_MODE_P_ER       (0x0004) // perms: everyone read
+#define I_MODE_P_GX       (0x0008) // perms: group execute
+#define I_MODE_P_GW       (0x0010) // perms: group write
+#define I_MODE_P_GR       (0x0020) // perms: group read
+#define I_MODE_P_UX       (0x0040) // perms: user execute
+#define I_MODE_P_UW       (0x0080) // perms: user write
+#define I_MODE_P_UR       (0x0100) // perms: user read
+#define I_MODE_F_DEL      (0x0200) // file type: deleted inode
+#define I_MODE_F_DIR      (0x0400) // file type: directory
+#define I_MODE_F_SYM      (0x0800) // file type: symlink
+#define I_MODE_F_SPE      (0x1000) // file type: special file (device etc.)
+#define I_MODE_F_REG      (0x2000) // file type: regular file
+#define I_MODE_FTYPE_MASK (0x3E00) // file type: mask
 
 struct __attribute__((packed)) dirent {
     uint32_t d_ptr; // pointer to the block the inode structure is in
@@ -70,6 +73,22 @@ static void block_bitmap_set(std::fstream &file, uint32_t block, bool used, bool
     file.seekg(pos);
 }
 
+static void block_bitmap_get(std::fstream &file, uint32_t block, bool *used, bool *inode) {
+    auto pos = file.tellg();
+
+    uint32_t byteoff = block / (8 / 2);
+    uint32_t bitoff = (block % (8 / 2)) * ((8 / 2) / 2);
+    file.seekg(byteoff, file.cur);
+    uint8_t b = file.get();
+    b >>= bitoff;
+    *used = b & 0b1;
+    *inode = (b >> 1) & 0b1;
+    file.seekg(-1, file.cur);
+    file.put(b);
+
+    file.seekg(pos);
+}
+
 // this function assumes the file passed is entirely empty and it's size is zero
 static void gen_empty_fs(std::fstream &file, uint32_t blocksize, uint32_t nblocks) {
     if (nblocks < 3) {
@@ -84,7 +103,6 @@ static void gen_empty_fs(std::fstream &file, uint32_t blocksize, uint32_t nblock
     file.put(0);
 
     uint32_t block_bitmap_blocks = (((nblocks / (8 / 2)) + ((8 / 2) - 1)) + (blocksize - 1)) / blocksize;
-
     // superblock
     file.seekg(blocksize * 0, std::ios::beg);
     struct superblock sb = {
@@ -92,7 +110,7 @@ static void gen_empty_fs(std::fstream &file, uint32_t blocksize, uint32_t nblock
         .s_root_ptr = 1 + block_bitmap_blocks,
         .s_root_idx = 0,
         .s_block_bitmap_st = 1,
-        .s_block_bitmap_nblocks = block_bitmap_blocks,
+        .s_block_bitmap_nblocks = nblocks,
     };
     file.write((char *)&sb, sizeof(sb));
 
@@ -109,7 +127,7 @@ static void gen_empty_fs(std::fstream &file, uint32_t blocksize, uint32_t nblock
     file.seekg(blocksize * (1 + block_bitmap_blocks), std::ios::beg);
     struct inode in;
     memset(&in, 0, sizeof(in));
-    in.i_mode = I_MODE_F_DIR;
+    in.i_mode = I_MODE_F_DIR | I_MODE_P_UR | I_MODE_P_UW | I_MODE_P_UX | I_MODE_P_GR | I_MODE_P_GX | I_MODE_P_ER | I_MODE_P_EX;
     file.write((char *)&in, sizeof(in));
     in.i_mode = I_MODE_F_DEL;
     for (uint32_t i = 0; i < ((blocksize / sizeof(in)) - 1); i++) {
@@ -117,9 +135,114 @@ static void gen_empty_fs(std::fstream &file, uint32_t blocksize, uint32_t nblock
     }
 }
 
+void do_ls(std::fstream &file) {
+    file.seekg(0, std::ios::beg);
+    struct superblock sb;
+    file.read((char *)&sb, sizeof(sb));
+
+    struct inode node;
+    file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(node)), std::ios::beg);
+    file.read((char *)&node, sizeof(node));
+    char ftype[1 + 9];
+    switch (node.i_mode & I_MODE_FTYPE_MASK) {
+    case I_MODE_F_DEL:
+        ftype[0] = 'X';
+        break;
+    case I_MODE_F_DIR:
+        ftype[0] = 'd';
+        break;
+    case I_MODE_F_SYM:
+        ftype[0] = 'l';
+        break;
+    case I_MODE_F_SPE:
+        ftype[0] = 's';
+        break;
+    case I_MODE_F_REG:
+        ftype[0] = '-';
+        break;
+    }
+    ftype[1] = (node.i_mode & I_MODE_P_UR) ? 'r' : '-';
+    ftype[2] = (node.i_mode & I_MODE_P_UW) ? 'w' : '-';
+    ftype[3] = (node.i_mode & I_MODE_P_UX) ? 'x' : '-';
+    ftype[4] = (node.i_mode & I_MODE_P_GR) ? 'r' : '-';
+    ftype[5] = (node.i_mode & I_MODE_P_GW) ? 'w' : '-';
+    ftype[6] = (node.i_mode & I_MODE_P_GX) ? 'x' : '-';
+    ftype[7] = (node.i_mode & I_MODE_P_ER) ? 'r' : '-';
+    ftype[8] = (node.i_mode & I_MODE_P_EW) ? 'w' : '-';
+    ftype[9] = (node.i_mode & I_MODE_P_EX) ? 'x' : '-';
+    printf("%.*s %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", (int)sizeof(ftype), ftype, node.i_ids & 0xFFFF, (node.i_ids >> 16) & 0xFFFF, node.i_size);
+}
+
+uint32_t alloc_data_block(std::fstream &file, struct superblock *super) {
+    auto pos = file.tellg();
+
+    file.seekg(super->s_blocksize * super->s_block_bitmap_st, std::ios::beg);
+
+    uint32_t found = 0;
+    for (uint32_t i = 0; i < super->s_block_bitmap_nblocks; i++) {
+        bool used, inode;
+        block_bitmap_get(file, i, &used, &inode);
+        if (!used) {
+            found = i;
+            block_bitmap_set(file, i, true, false);
+            break;
+        }
+    }
+
+    file.seekg(pos);
+    return found;
+}
+
+void inode_write_bytes(std::fstream &file, struct superblock *super, struct inode *node, const char *data, uint32_t nbytes) {
+    uint32_t required_blocks = ((node->i_size + nbytes) + (super->s_blocksize - 1)) / super->s_blocksize;
+    if (required_blocks > 8) {
+        throw std::runtime_error("indirect blocks unsupported");
+    }
+    for (uint32_t i = 0; i < required_blocks; i++) {
+        if (node->i_blocks[i] == 0) {
+            uint32_t alloc = alloc_data_block(file, super);
+            if (alloc == 0) {
+                throw std::runtime_error("error allocating block");
+            }
+            node->i_blocks[i] = alloc;
+        }
+    }
+    auto pos = file.tellg();
+
+    for (uint32_t i = 0; i < nbytes; i++) {
+        uint32_t block = (node->i_size + i) / super->s_blocksize;
+        uint32_t offset = (node->i_size + i) % super->s_blocksize;
+        file.seekg((node->i_blocks[block] * super->s_blocksize) + offset, std::ios::beg);
+        printf("w: %u %c\n", (node->i_blocks[block] * super->s_blocksize) + offset, data[i]);
+        file.write(&data[i], 1);
+    }
+    node->i_size += nbytes;
+
+    file.seekg(pos);
+}
+
+void create_file(std::fstream &file, const char *fname) {
+    file.seekg(0, std::ios::beg);
+    struct superblock sb;
+    file.read((char *)&sb, sizeof(sb));
+
+    char contents[] = "Hello world filesystem!";
+
+    struct inode root;
+    file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(root)), std::ios::beg);
+    file.read((char *)&root, sizeof(root));
+    inode_write_bytes(file, &sb, &root, contents, sizeof(contents));
+    file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(root)), std::ios::beg);
+    file.write((char *)&root, sizeof(root));
+}
+
 int main(int argc, char **argv) {
     std::fstream outf("./fs.bin", std::ios::in | std::ios::out | std::ios::trunc | std::ios::binary);
 
     gen_empty_fs(outf, 512, 1000);
+    do_ls(outf);
+    create_file(outf, "test1");
+    // create_file(outf, "test2");
+    do_ls(outf);
     return 0;
 }
