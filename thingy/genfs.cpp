@@ -84,7 +84,6 @@ static void block_bitmap_get(std::fstream &file, uint32_t block, bool *used, boo
     *used = b & 0b1;
     *inode = (b >> 1) & 0b1;
     file.seekg(-1, file.cur);
-    file.put(b);
 
     file.seekg(pos);
 }
@@ -135,45 +134,7 @@ static void gen_empty_fs(std::fstream &file, uint32_t blocksize, uint32_t nblock
     }
 }
 
-void do_ls(std::fstream &file) {
-    file.seekg(0, std::ios::beg);
-    struct superblock sb;
-    file.read((char *)&sb, sizeof(sb));
-
-    struct inode node;
-    file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(node)), std::ios::beg);
-    file.read((char *)&node, sizeof(node));
-    char ftype[1 + 9];
-    switch (node.i_mode & I_MODE_FTYPE_MASK) {
-    case I_MODE_F_DEL:
-        ftype[0] = 'X';
-        break;
-    case I_MODE_F_DIR:
-        ftype[0] = 'd';
-        break;
-    case I_MODE_F_SYM:
-        ftype[0] = 'l';
-        break;
-    case I_MODE_F_SPE:
-        ftype[0] = 's';
-        break;
-    case I_MODE_F_REG:
-        ftype[0] = '-';
-        break;
-    }
-    ftype[1] = (node.i_mode & I_MODE_P_UR) ? 'r' : '-';
-    ftype[2] = (node.i_mode & I_MODE_P_UW) ? 'w' : '-';
-    ftype[3] = (node.i_mode & I_MODE_P_UX) ? 'x' : '-';
-    ftype[4] = (node.i_mode & I_MODE_P_GR) ? 'r' : '-';
-    ftype[5] = (node.i_mode & I_MODE_P_GW) ? 'w' : '-';
-    ftype[6] = (node.i_mode & I_MODE_P_GX) ? 'x' : '-';
-    ftype[7] = (node.i_mode & I_MODE_P_ER) ? 'r' : '-';
-    ftype[8] = (node.i_mode & I_MODE_P_EW) ? 'w' : '-';
-    ftype[9] = (node.i_mode & I_MODE_P_EX) ? 'x' : '-';
-    printf("%.*s %" PRIu32 " %" PRIu32 " %" PRIu32 "\n", (int)sizeof(ftype), ftype, node.i_ids & 0xFFFF, (node.i_ids >> 16) & 0xFFFF, node.i_size);
-}
-
-uint32_t alloc_data_block(std::fstream &file, struct superblock *super) {
+static uint32_t alloc_data_block(std::fstream &file, struct superblock *super) {
     auto pos = file.tellg();
 
     file.seekg(super->s_blocksize * super->s_block_bitmap_st, std::ios::beg);
@@ -193,32 +154,109 @@ uint32_t alloc_data_block(std::fstream &file, struct superblock *super) {
     return found;
 }
 
-void inode_write_bytes(std::fstream &file, struct superblock *super, struct inode *node, const char *data, uint32_t nbytes) {
-    uint32_t required_blocks = ((node->i_size + nbytes) + (super->s_blocksize - 1)) / super->s_blocksize;
-    if (required_blocks > 8) {
-        throw std::runtime_error("indirect blocks unsupported");
-    }
-    for (uint32_t i = 0; i < required_blocks; i++) {
-        if (node->i_blocks[i] == 0) {
-            uint32_t alloc = alloc_data_block(file, super);
-            if (alloc == 0) {
-                throw std::runtime_error("error allocating block");
+static void inode_io_bytes(std::fstream &file, struct superblock *super, struct inode *node, char *data, uint32_t nbytes, bool write) {
+    if (write) {
+        uint32_t required_blocks = ((node->i_size + nbytes) + (super->s_blocksize - 1)) / super->s_blocksize;
+        if (required_blocks > 8) {
+            throw std::runtime_error("indirect blocks unsupported");
+        }
+        for (uint32_t i = 0; i < required_blocks; i++) {
+            if (node->i_blocks[i] == 0) {
+                uint32_t alloc = alloc_data_block(file, super);
+                if (alloc == 0) {
+                    throw std::runtime_error("error allocating block");
+                }
+                node->i_blocks[i] = alloc;
             }
-            node->i_blocks[i] = alloc;
         }
     }
     auto pos = file.tellg();
 
-    for (uint32_t i = 0; i < nbytes; i++) {
-        uint32_t block = (node->i_size + i) / super->s_blocksize;
-        uint32_t offset = (node->i_size + i) % super->s_blocksize;
-        file.seekg((node->i_blocks[block] * super->s_blocksize) + offset, std::ios::beg);
-        printf("w: %u %c\n", (node->i_blocks[block] * super->s_blocksize) + offset, data[i]);
-        file.write(&data[i], 1);
+    // TODO: argument
+    uint32_t pos_beg = node->i_size;
+    if (!write) {
+        pos_beg = 0;
     }
-    node->i_size += nbytes;
+
+    for (uint32_t i = 0; i < nbytes; i++) {
+        uint32_t block = (pos_beg + i) / super->s_blocksize;
+        uint32_t offset = (pos_beg + i) % super->s_blocksize;
+        if (node->i_blocks[block] == 0) {
+            throw std::runtime_error("error doing IO on inode");
+        }
+        file.seekg((node->i_blocks[block] * super->s_blocksize) + offset, std::ios::beg);
+        if (write) {
+            file.write(&data[i], 1);
+        } else {
+            file.read(&data[i], 1);
+        }
+    }
+    if (write) {
+        node->i_size += nbytes;
+    }
 
     file.seekg(pos);
+}
+
+void do_ls(std::fstream &file) {
+    file.seekg(0, std::ios::beg);
+    struct superblock sb;
+    file.read((char *)&sb, sizeof(sb));
+
+    auto print_inode_info = [](const char *name, struct inode *node) {
+        char ftype[1 + 9];
+        switch (node->i_mode & I_MODE_FTYPE_MASK) {
+        case I_MODE_F_DEL:
+            ftype[0] = 'X';
+            break;
+        case I_MODE_F_DIR:
+            ftype[0] = 'd';
+            break;
+        case I_MODE_F_SYM:
+            ftype[0] = 'l';
+            break;
+        case I_MODE_F_SPE:
+            ftype[0] = 's';
+            break;
+        case I_MODE_F_REG:
+            ftype[0] = '-';
+            break;
+        }
+        ftype[1] = (node->i_mode & I_MODE_P_UR) ? 'r' : '-';
+        ftype[2] = (node->i_mode & I_MODE_P_UW) ? 'w' : '-';
+        ftype[3] = (node->i_mode & I_MODE_P_UX) ? 'x' : '-';
+        ftype[4] = (node->i_mode & I_MODE_P_GR) ? 'r' : '-';
+        ftype[5] = (node->i_mode & I_MODE_P_GW) ? 'w' : '-';
+        ftype[6] = (node->i_mode & I_MODE_P_GX) ? 'x' : '-';
+        ftype[7] = (node->i_mode & I_MODE_P_ER) ? 'r' : '-';
+        ftype[8] = (node->i_mode & I_MODE_P_EW) ? 'w' : '-';
+        ftype[9] = (node->i_mode & I_MODE_P_EX) ? 'x' : '-';
+        printf("%.*s %" PRIu32 " %" PRIu32 " %" PRIu32 " %.24s\n",
+               (int)sizeof(ftype),
+               ftype,
+               node->i_ids & 0xFFFF,
+               (node->i_ids >> 16) & 0xFFFF,
+               node->i_size,
+               name);
+    };
+
+    struct inode root;
+    file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(root)), std::ios::beg);
+    file.read((char *)&root, sizeof(root));
+    // print_inode_info(".", &root);
+
+    struct dirent de;
+    struct inode node;
+    for (int i = 0; i < root.i_size; i += sizeof(de)) {
+        inode_io_bytes(file, &sb, &root, (char *)&de, sizeof(de), false);
+        file.seekg((de.d_ptr * sb.s_blocksize) + (de.d_idx * sizeof(node)), std::ios::beg);
+        file.read((char *)&node, sizeof(node));
+        print_inode_info(de.name, &node);
+        char *buf = (char *)malloc(node.i_size);
+        inode_io_bytes(file, &sb, &node, buf, node.i_size, false);
+        printf("file contents: %.*s\n", node.i_size, buf);
+        free(buf);
+    }
 }
 
 void create_file(std::fstream &file, const char *fname) {
@@ -231,7 +269,22 @@ void create_file(std::fstream &file, const char *fname) {
     struct inode root;
     file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(root)), std::ios::beg);
     file.read((char *)&root, sizeof(root));
-    inode_write_bytes(file, &sb, &root, contents, sizeof(contents));
+
+    // TODO: inode alloc
+
+    struct inode inew;
+    memset(&inew, 0, sizeof(inew));
+    inew.i_mode = I_MODE_F_REG | I_MODE_P_UR | I_MODE_P_UW | I_MODE_P_UX | I_MODE_P_GR | I_MODE_P_GX | I_MODE_P_ER | I_MODE_P_EX;
+    struct dirent de {
+        .d_ptr = sb.s_root_ptr, .d_idx = sb.s_root_idx + 1, .name = {0},
+    };
+    strcpy(de.name, fname); // TODO: check length
+    inode_io_bytes(file, &sb, &root, (char *)&de, sizeof(de), true);
+    inode_io_bytes(file, &sb, &inew, contents, sizeof(contents), true);
+
+    file.seekg((de.d_ptr * sb.s_blocksize) + (de.d_idx * sizeof(root)), std::ios::beg);
+    file.write((char *)&inew, sizeof(inew));
+
     file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(root)), std::ios::beg);
     file.write((char *)&root, sizeof(root));
 }
