@@ -21,6 +21,9 @@ kernel.bin: $(ASMFILES_KERNEL)
 genfs: genfs.cpp
 	g++ -o $@ $^
 
+ls: ls.cpp drv.h
+	g++ -o $@ ls.cpp
+
 run: rom.bin bootloader.bin
 	cp rom.bin output.bin
 	cp bootloader.bin hd.bin
