@@ -10,7 +10,7 @@
 
 // the block size should be divisible by the size of this structure
 struct __attribute__((packed)) inode {
-    uint32_t i_mode;           // bottom 9 bits are unix permissions, // TODO: top bits for inode type
+    uint32_t i_mode;
     uint32_t i_ids;            // bottom 16 bits UID top 16 GID
     uint32_t i_ctime;          // creation time (UTC seconds since January 1st 1970)
     uint32_t i_mtime;          // modification time (UTC seconds since January 1st 1970)
@@ -38,10 +38,12 @@ struct __attribute__((packed)) inode {
 #define I_MODE_FTYPE_MASK (0x3E00) // file type: mask
 
 struct __attribute__((packed)) dirent {
-    uint32_t d_ptr; // pointer to the block the inode structure is in
-    uint32_t d_idx; // index of the inode structure in the block
-    char name[24];  // filename
+    uint32_t d_mod;
+    uint32_t d_ptr;  // pointer to the block the inode structure is in
+    uint32_t d_idx;  // index of the inode structure in the block
+    char d_name[52]; // filename
 };
+#define D_MOD_DEL (0x0001)
 
 struct __attribute__((packed)) superblock {
     uint32_t s_blocksize;            // block size used (power of two! and must be larger than the largest structure (which is currently the inode))
@@ -231,7 +233,7 @@ void do_ls(std::fstream &file) {
         ftype[7] = (node->i_mode & I_MODE_P_ER) ? 'r' : '-';
         ftype[8] = (node->i_mode & I_MODE_P_EW) ? 'w' : '-';
         ftype[9] = (node->i_mode & I_MODE_P_EX) ? 'x' : '-';
-        printf("%.*s %" PRIu32 " %" PRIu32 " %" PRIu32 " %.24s\n",
+        printf("%.*s %" PRIu32 " %" PRIu32 " %" PRIu32 " %.52s\n",
                (int)sizeof(ftype),
                ftype,
                node->i_ids & 0xFFFF,
@@ -243,7 +245,7 @@ void do_ls(std::fstream &file) {
     struct inode root;
     file.seekg((sb.s_root_ptr * sb.s_blocksize) + (sb.s_root_idx * sizeof(root)), std::ios::beg);
     file.read((char *)&root, sizeof(root));
-    // print_inode_info(".", &root);
+    print_inode_info(".", &root);
 
     struct dirent de;
     struct inode node;
@@ -251,7 +253,7 @@ void do_ls(std::fstream &file) {
         inode_io_bytes(file, &sb, &root, (char *)&de, sizeof(de), false);
         file.seekg((de.d_ptr * sb.s_blocksize) + (de.d_idx * sizeof(node)), std::ios::beg);
         file.read((char *)&node, sizeof(node));
-        print_inode_info(de.name, &node);
+        print_inode_info(de.d_name, &node);
         char *buf = (char *)malloc(node.i_size);
         inode_io_bytes(file, &sb, &node, buf, node.i_size, false);
         printf("file contents: %.*s\n", node.i_size, buf);
@@ -276,9 +278,9 @@ void create_file(std::fstream &file, const char *fname) {
     memset(&inew, 0, sizeof(inew));
     inew.i_mode = I_MODE_F_REG | I_MODE_P_UR | I_MODE_P_UW | I_MODE_P_UX | I_MODE_P_GR | I_MODE_P_GX | I_MODE_P_ER | I_MODE_P_EX;
     struct dirent de {
-        .d_ptr = sb.s_root_ptr, .d_idx = sb.s_root_idx + 1, .name = {0},
+        .d_mod = 0, .d_ptr = sb.s_root_ptr, .d_idx = sb.s_root_idx + 1, .d_name = {0},
     };
-    strcpy(de.name, fname); // TODO: check length
+    strcpy(de.d_name, fname); // BUG: check length
     inode_io_bytes(file, &sb, &root, (char *)&de, sizeof(de), true);
     inode_io_bytes(file, &sb, &inew, contents, sizeof(contents), true);
 

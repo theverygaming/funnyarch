@@ -17,7 +17,7 @@ struct __attribute__((packed)) superblock {
 
 // the block size should be divisible by the size of this structure
 struct __attribute__((packed)) inode {
-    uint32_t i_mode;           // bottom 9 bits are unix permissions, // TODO: top bits for inode type
+    uint32_t i_mode;
     uint32_t i_ids;            // bottom 16 bits UID top 16 GID
     uint32_t i_ctime;          // creation time (UTC seconds since January 1st 1970)
     uint32_t i_mtime;          // modification time (UTC seconds since January 1st 1970)
@@ -49,9 +49,11 @@ struct __attribute__((packed)) inode {
  */
 
 struct __attribute__((packed)) dirent {
+    uint32_t d_mod;
     struct inode_ptr d_ptr;
-    char name[24]; // filename
+    char d_name[52]; // filename
 };
+#define D_MOD_DEL (0x0001)
 
 // driver structures
 
@@ -67,14 +69,22 @@ struct drv_ctx {
     struct superblock super;
 };
 
-struct inode_read_handle {
+struct inode_io_handle {
     struct inode_ptr ptr;
     struct inode node;
     uint32_t pos;
 };
 
-#ifdef DRV_IMPL
+int drv_init(struct drv_ctx *ctx);
+int ino_open(struct drv_ctx *ctx, struct inode_io_handle *hndl, struct inode_ptr *ptr);
+#define INO_SEEK_BEG (1)
+#define INO_SEEK_CUR (2)
+#define INO_SEEK_END (3)
+uint32_t ino_seek(struct drv_ctx *ctx, struct inode_io_handle *hndl, int pos, int mode);
+uint32_t ino_read(struct drv_ctx *ctx, struct inode_io_handle *hndl, char *buf, uint32_t n);
+int open_root_node(struct drv_ctx *ctx, struct inode_io_handle *hndl);
 
+#ifdef DRV_IMPL
 int drv_init(struct drv_ctx *ctx) {
     if (ctx->dread(ctx->rw_ctx, 0, (char *)&ctx->super, sizeof(ctx->super)) != sizeof(ctx->super)) {
         return -1;
@@ -83,10 +93,11 @@ int drv_init(struct drv_ctx *ctx) {
     return 0;
 }
 
-int ino_open(struct drv_ctx *ctx, struct inode_ptr *ptr, struct inode_read_handle *hndl) {
+int ino_open(struct drv_ctx *ctx, struct inode_io_handle *hndl, struct inode_ptr *ptr) {
     hndl->ptr = *ptr;
+    hndl->pos = 0;
     if (ctx->dread(ctx->rw_ctx,
-                   (hndl->ptr.ip_block + ctx->super.s_blocksize) + (hndl->ptr.ip_off * sizeof(hndl->node)),
+                   (hndl->ptr.ip_block * ctx->super.s_blocksize) + (hndl->ptr.ip_off * sizeof(hndl->node)),
                    (char *)&hndl->node,
                    sizeof(hndl->node)) != sizeof(hndl->node)) {
         return -1;
@@ -97,8 +108,54 @@ int ino_open(struct drv_ctx *ctx, struct inode_ptr *ptr, struct inode_read_handl
     return 0;
 };
 
-//int ino_read(struct drv_ctx *ctx, )
+#define INO_SEEK_BEG (1)
+#define INO_SEEK_CUR (2)
+#define INO_SEEK_END (3)
+uint32_t ino_seek(struct drv_ctx *ctx, struct inode_io_handle *hndl, int pos, int mode) {
+    switch (mode) {
+    case INO_SEEK_BEG:
+        hndl->pos = pos;
+        break;
+    case INO_SEEK_CUR:
+        hndl->pos += pos;
+        break;
+    case INO_SEEK_END:
+        hndl->pos = hndl->node.i_size + pos;
+        break;
+    }
+    if (hndl->pos > hndl->node.i_size) {
+        hndl->pos = hndl->node.i_size;
+    }
 
-#else
-int drv_init(struct drv_ctx ctx *)();
+    return hndl->pos;
+}
+
+uint32_t ino_read(struct drv_ctx *ctx, struct inode_io_handle *hndl, char *buf, uint32_t n) {
+    if (((hndl->pos + n) > hndl->node.i_size) || (n > hndl->node.i_size)) {
+        n = hndl->node.i_size - hndl->pos;
+    }
+
+    uint32_t nread = 0;
+
+    while (n != 0) {
+        uint32_t block = hndl->pos / ctx->super.s_blocksize;
+        uint32_t offset = hndl->pos % ctx->super.s_blocksize;
+        if ((block > 7) || (hndl->node.i_blocks[block] == 0)) { // TODO: indirect block support
+            break;
+        }
+        if (ctx->dread(ctx->rw_ctx, (hndl->node.i_blocks[block] * ctx->super.s_blocksize) + offset, &buf[nread], 1) != 1) {
+            break;
+        }
+        nread++;
+        hndl->pos++;
+        n--;
+    }
+
+    return nread;
+}
+
+int open_root_node(struct drv_ctx *ctx, struct inode_io_handle *hndl) {
+    return ino_open(ctx, hndl, &ctx->super.s_root_ptr);
+}
+
 #endif
