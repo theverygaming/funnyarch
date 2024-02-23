@@ -1,26 +1,35 @@
-CC = gcc
-CFLAGS = -ffreestanding -nostdlib
+CC = i686-elf-gcc
+LD = i686-elf-ld
+CFLAGS = -O3 -ffreestanding -nostdlib
 
 COMP = python3 ../../compiler.py
 
 .PHONY: all
-all: demo
+all: boot.iso
 
+OBJS = obj/kernel/kmain.o \
+	   obj/kernel/arch/IA-32/init.o \
+	   obj/kernel/arch/IA-32/mem.o \
+	   obj/kernel/arch/IA-32/printk.o
 
-demo: demo.o syscall.o
-	@$(CC) $(CFLAGS) -o $@ $^
+obj/kernel.o: obj/kernel/arch/IA-32/boot.o $(OBJS)
+	@$(LD) -T kernel/linker.ld -nostdlib $(filter %.o,$^) -o $@
 
+boot.iso: obj/kernel.o 
+	@./boot/createimg.sh
 
-%.c: %.py
-	@$(COMP) -o $@ $^
+obj/%.c: %.py
+	@mkdir -p $(dir $@)
+	@$(COMP) -o $@ $<
 
-%.o: %.c
-	@$(CC) $(CFLAGS) -o $@ -c $^
+obj/%.o: %.c
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -o $@ -c $<
 
-
-%.o: %.S
-	@$(CC) $(CFLAGS) -o $@ -c $^
+obj/%.o: %.S
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	@rm -f demo.o syscall.o
-	@rm -f demo
+	@rm -rf obj/
+	@rm -f boot.iso

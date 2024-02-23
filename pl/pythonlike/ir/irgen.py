@@ -1,5 +1,6 @@
 import sys
 import ast
+from random import random
 import ir.ir as ir
 
 def _assertion(value, error):
@@ -38,7 +39,7 @@ def _gen_expr(result, op):
         if isinstance(op.value, str):
             global _global_counter
             _global_counter += 1
-            name = f"__compiler_global_{_global_counter}"
+            name = f"__compiler_global_{_global_counter}_{int(random()*1000000000)}" # FIXME: this definitely isn't a great solution lol, we need non-exported globals
             _globalvars[name] = op.value
             return [ ir.SetRegGlobalPtr(result, name) ]
         else:
