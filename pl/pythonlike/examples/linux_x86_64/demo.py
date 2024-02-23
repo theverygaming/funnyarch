@@ -29,6 +29,7 @@ def puts(s):
 def exit(n):
     do_linux_syscall(0x3c, n)
 
+@export
 def _start():
     # Use the global keyword to get a local variable with the same name as the global you are trying to access.
     # The local variable will contain a **pointer** to the global variable

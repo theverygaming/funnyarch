@@ -167,7 +167,7 @@ def gen_assembly(irl):
             args = ""
             for n in range(instr.nargs):
                 args += f"{', ' if n != 0 else ''}{_default_type} arg_{n}"
-            write_asm(f"{_default_type} {instr.name}({args}) {{\n")
+            write_asm(f"{'' if instr.export else 'static '}{_default_type} {instr.name}({args}) {{\n")
             #if instr.nlocals != 0:
             #    write_asm(f"  {_default_type} locals[{instr.nlocals}];\n")
             func_asm, func_used_regs = _gen_asm_infunc(instr.body, global_syms)

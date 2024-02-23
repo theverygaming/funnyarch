@@ -16,9 +16,10 @@ class GlobalVarDef(BaseIrObj):
 
 
 class Function(BaseIrObj):
-    def __init__(self, name, leaf, nlocals, nargs, body):
+    def __init__(self, name, leaf, export, nlocals, nargs, body):
         self.name = name
         self.leaf = leaf
+        self.export = export
         self.nlocals = nlocals
         self.nargs = nargs
         self.body = body

@@ -254,6 +254,7 @@ def gen_ast_node(node, depth=0):
         _func_locals = {}
         _func_is_leaf = True
         _label_counter = -1
+        _func_export = False
         fbody = []
         for argn, arg in enumerate(node.args.args):
             _assertion(arg.arg not in _func_locals, "double argument")
@@ -262,7 +263,11 @@ def gen_ast_node(node, depth=0):
             fbody.append(ir.SetRegFuncArg(n, argn))
         for n in node.body:
             fbody += gen_ast_node(n, depth + 1)
-        return [ir.Function(node.name, _func_is_leaf, len(_func_locals), len(node.args.args), fbody)]
+        for deco in node.decorator_list:
+            if isinstance(deco, ast.Name):
+                if deco.id == "export":
+                    _func_export = True
+        return [ir.Function(node.name, _func_is_leaf, _func_export, len(_func_locals), len(node.args.args), fbody)]
 
     _assertion(False, f"cannot generate IR for AST node {ast.dump(node)}")
 
