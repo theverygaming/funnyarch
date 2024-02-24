@@ -28,3 +28,12 @@ def print(s):
         putc(c)
         s = s + 1
         c = read_byte_unaligned(s)
+
+@export
+def ia32_printk_init():
+    screen_ptr = 0xb8000
+    # clear screen
+    cursor = 0
+    while cursor < (80*25*2):
+        write_byte_unaligned(screen_ptr+cursor, 0)
+        cursor = cursor + 1

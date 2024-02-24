@@ -10,9 +10,9 @@ class BaseIrObj:
 
 
 class GlobalVarDef(BaseIrObj):
-    def __init__(self, name, value):
+    def __init__(self, name, values):
         self.name = name
-        self.value = value
+        self.values = values
 
 
 class Function(BaseIrObj):

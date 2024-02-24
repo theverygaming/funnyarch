@@ -153,14 +153,24 @@ def gen_assembly(irl):
         # write_asm(f"// IR: {instr}\n")
         if isinstance(instr, ir.GlobalVarDef):
             sym_defs.append(instr.name)
-            if isinstance(instr.value, str):
-                write_asm(f'char {instr.name}[] = "{_c_str_esc(instr.value)}";\n')
-            elif isinstance(instr.value, int):
-                write_asm(f"{_default_type} {instr.name} = {instr.value};\n")
+            if len(instr.values) == 1:
+                if isinstance(instr.values[0], str):
+                    write_asm(f'char {instr.name}[] = "{_c_str_esc(instr.values[0])}";\n')
+                elif isinstance(instr.values[0], int):
+                    write_asm(f"{_default_type} {instr.name} = {instr.values[0]};\n")
+                else:
+                    raise Exception(
+                        f"unknown variable type {type(instr.value)} while emitting global variable {instr.name}"
+                    )
             else:
-                raise Exception(
-                    f"unknown variable type {type(instr.value)} while emitting global variable {instr.name}"
-                )
+                write_asm(f"{_default_type} {instr.name}[] = {{\n")
+                for i, val in enumerate(instr.values):
+                    if not isinstance(val, int):
+                        raise Exception(
+                            f"unknown variable type {type(val)} while emitting global array {instr.name}"
+                        )
+                    write_asm(f"{', ' if i != 0 else ''}{val}")
+                write_asm(f"}};\n")
             continue
         if isinstance(instr, ir.Function):
             sym_defs.append(instr.name)

@@ -40,7 +40,7 @@ def _gen_expr(result, op):
             global _global_counter
             _global_counter += 1
             name = f"__compiler_global_{_global_counter}_{int(random()*1000000000)}" # FIXME: this definitely isn't a great solution lol, we need non-exported globals
-            _globalvars[name] = op.value
+            _globalvars[name] = [op.value]
             return [ ir.SetRegGlobalPtr(result, name) ]
         else:
             _assertion(False, "unsupported constant type")
@@ -106,11 +106,16 @@ def gen_ast_node(node, depth=0):
         _assert_instance(target.ctx, ast.Store, "can only store assign")
         if depth == 0:  # TODO: better way to check depth
             _assert_instance(target, ast.Name, "invalid global assignment")
-            _assert_instance(
-                node.value, ast.Constant, "can only assign constant to globals"
-            )
+            _assertion(isinstance(node.value, ast.Constant) or isinstance(node.value, ast.List), "can only assign constant or arrays of constants to globals")
             _assertion(target.id not in _globalvars, "global variable already defined")
-            _globalvars[target.id] = node.value.value
+            if isinstance(node.value, ast.List):
+                for el in node.value.elts:
+                    _assert_instance(
+                        el, ast.Constant, "can only assign constant to globals"
+                    )
+                _globalvars[target.id] = [x.value for x in node.value.elts]
+            else:
+                _globalvars[target.id] = [node.value.value]
         else:
             if isinstance(target, ast.Subscript):
                 _assertion(target.value.id in _func_locals, f"undefined variable {target.value.id}")

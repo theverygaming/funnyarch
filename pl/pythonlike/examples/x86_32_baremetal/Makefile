@@ -10,6 +10,10 @@ all: boot.iso
 OBJS = obj/kernel/kmain.o \
 	   obj/kernel/arch/IA-32/init.o \
 	   obj/kernel/arch/IA-32/mem.o \
+	   obj/kernel/arch/IA-32/gdt.o \
+	   obj/kernel/arch/IA-32/gdt_asm.o \
+	   obj/kernel/arch/IA-32/idt.o \
+	   obj/kernel/arch/IA-32/idt_asm.o \
 	   obj/kernel/arch/IA-32/printk.o
 
 obj/kernel.o: obj/kernel/arch/IA-32/boot.o $(OBJS)
@@ -18,6 +22,7 @@ obj/kernel.o: obj/kernel/arch/IA-32/boot.o $(OBJS)
 boot.iso: obj/kernel.o 
 	@./boot/createimg.sh
 
+.PRECIOUS: obj/%.c
 obj/%.c: %.py
 	@mkdir -p $(dir $@)
 	@$(COMP) -o $@ $<
