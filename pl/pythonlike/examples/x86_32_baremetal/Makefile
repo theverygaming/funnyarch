@@ -1,6 +1,6 @@
 CC = i686-elf-gcc
 LD = i686-elf-ld
-CFLAGS = -O1 -nostdlib -fno-pie -mno-red-zone -ffreestanding -fno-exceptions -mno-mmx -mno-sse -mno-sse2
+CFLAGS = -O3 -nostdlib -fno-pie -mno-red-zone -ffreestanding -fno-exceptions -mno-mmx -mno-sse -mno-sse2 -Wall -Wextra -Wpedantic -Werror -Wno-unused-but-set-variable
 
 COMP = python3 ../../compiler.py
 

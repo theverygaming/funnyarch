@@ -11,6 +11,7 @@ def ia32_handle_int(n, err):
         print(" e=")
         print_n_hex(err)
         print(")\n")
+        panic("exception")
         while 1 == 1:
             pass
     #print("interrupt (n=")
