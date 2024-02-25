@@ -85,7 +85,12 @@ def _gen_fn_call(op, return_regn = None):
         reg = _alloc_vreg()
         argRegs.append(reg)
         argRegIr += _gen_expr(reg, arg)
-    return argRegIr + [ir.FuncCall(op.func.id, argRegs, return_regn)]
+    if op.func.id in _func_locals:
+        n = _func_locals[op.func.id]
+    else:
+        n = _alloc_vreg()
+        argRegIr.append(ir.SetRegGlobalPtr(n, op.func.id))
+    return argRegIr + [ir.FuncCall(n, argRegs, return_regn)]
 
 
 def gen_ast_node(node, depth=0):

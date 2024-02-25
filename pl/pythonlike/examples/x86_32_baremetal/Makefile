@@ -1,22 +1,18 @@
 CC = i686-elf-gcc
 LD = i686-elf-ld
-CFLAGS = -O3 -ffreestanding -nostdlib
+CFLAGS = -O1 -nostdlib -fno-pie -mno-red-zone -ffreestanding -fno-exceptions -mno-mmx -mno-sse -mno-sse2
 
 COMP = python3 ../../compiler.py
 
 .PHONY: all
 all: boot.iso
 
-OBJS = obj/kernel/kmain.o \
-	   obj/kernel/arch/IA-32/init.o \
-	   obj/kernel/arch/IA-32/mem.o \
-	   obj/kernel/arch/IA-32/gdt.o \
-	   obj/kernel/arch/IA-32/gdt_asm.o \
-	   obj/kernel/arch/IA-32/idt.o \
-	   obj/kernel/arch/IA-32/idt_asm.o \
-	   obj/kernel/arch/IA-32/printk.o
+PYFILES = $(shell find ./kernel -type f -name "*.py")
+ASMFILES= $(shell find ./kernel -type f -name "*.S")
 
-obj/kernel.o: obj/kernel/arch/IA-32/boot.o $(OBJS)
+OBJS = $(addprefix obj/,$(PYFILES:.py=.o) $(ASMFILES:.S=.o))
+
+obj/kernel.o: $(OBJS)
 	@$(LD) -T kernel/linker.ld -nostdlib $(filter %.o,$^) -o $@
 
 boot.iso: obj/kernel.o 
@@ -28,6 +24,10 @@ obj/%.c: %.py
 	@$(COMP) -o $@ $<
 
 obj/%.o: %.c
+	@mkdir -p $(dir $@)
+	@$(CC) $(CFLAGS) -o $@ -c $<
+
+obj/%.o: obj/%.c
 	@mkdir -p $(dir $@)
 	@$(CC) $(CFLAGS) -o $@ -c $<
 

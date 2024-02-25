@@ -11,3 +11,8 @@ ia32_idt_load:
     mov %ebp, %esp
     popl %ebp
     ret
+
+.global ia32_enable_interrupts
+ia32_enable_interrupts:
+    sti
+    ret

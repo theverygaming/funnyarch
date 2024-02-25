@@ -37,8 +37,8 @@ class FuncReturnReg(BaseIrObj):
 
 
 class FuncCall(BaseIrObj):
-    def __init__(self, name, arg_regns, return_regn = None):
-        self.name = name
+    def __init__(self, regn, arg_regns, return_regn = None):
+        self.regn = regn
         self.arg_regns = arg_regns
         self.return_regn = return_regn
 
@@ -126,6 +126,7 @@ class ThreeAddressInstr(BaseIrObj):
 
 
 class Operators(Enum):
+    # two args
     ADD = 1
     SUB = 2
     MULT = 3

@@ -96,15 +96,14 @@ def _gen_asm_infunc(irl, global_syms):
             write_asm(f"return vreg_{instr.regn};\n")
             continue
         if isinstance(instr, ir.FuncCall):
-            if instr.return_regn:
+            if instr.return_regn is not None:
                 use_reg(instr.return_regn)
             args_def = ""
             args_regs = ""
             for n, argreg in enumerate(instr.arg_regns):
                 args_def += f"{', ' if n != 0 else ''}{_default_type}"
                 args_regs += f"{', ' if n != 0 else ''}vreg_{argreg}"
-            use_global(instr.name)
-            write_asm(f"{f'vreg_{instr.return_regn} = 'if instr.return_regn else ''}(({_default_type} (*)({args_def}))&{instr.name})({args_regs});\n")
+            write_asm(f"{f'vreg_{instr.return_regn} = 'if instr.return_regn is not None else ''}(({_default_type} (*)({args_def}))vreg_{instr.regn})({args_regs});\n")
             continue
         if isinstance(instr, ir.SetRegImm):
             use_reg(instr.regn)
@@ -195,7 +194,7 @@ def gen_assembly(irl):
     nglobals = 0
     for gs in global_syms:
         if gs not in sym_defs:
-            final_asm += f"extern {_default_type} {gs};\n"
+            final_asm += f"extern {_default_type} {gs}[];\n"
             nglobals += 1
     if nglobals > 0:
         final_asm += "\n"
