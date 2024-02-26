@@ -7,5 +7,6 @@ stdenv.mkDerivation {
     grub2
     xorriso
     pkgsCross.i686-embedded.buildPackages.gcc
+    qemu
   ];
 }

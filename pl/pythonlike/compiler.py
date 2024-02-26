@@ -15,10 +15,11 @@ with open(args.infilename, "r", encoding="utf-8") as f:
 
     ir = []
 
+    ctx = irgen.IrGenContext()
     for node in astnodes:
-        ir += irgen.gen_ast_node(node)
+        ir += irgen.gen_ast_node(ctx, node)
 
-    ir = irgen.gen_global_vars() + ir
+    ir = irgen.gen_global_vars(ctx) + ir
 
     asm = codegen.gen_assembly(ir)
     with open(args.out, "w", encoding="utf-8") as f:
