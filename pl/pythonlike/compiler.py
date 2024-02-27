@@ -6,7 +6,9 @@ import backend.codegen as codegen
 
 parser = argparse.ArgumentParser(description="Weird compiler")
 parser.add_argument("infilename", metavar="input", help="input file name", type=str)
-parser.add_argument("-o", "--out", metavar="out", help="output file name", required=True, type=str)
+parser.add_argument(
+    "-o", "--out", metavar="out", help="output file name", required=True, type=str
+)
 args = parser.parse_args()
 
 

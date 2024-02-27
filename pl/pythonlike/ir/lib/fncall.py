@@ -3,7 +3,7 @@ import ir.ir as ir
 import ir.lib as irlib
 
 
-def gen_call(ctx, op, return_regn = None):
+def gen_call(ctx, op, return_regn=None):
     irlib.assertion(len(op.keywords) == 0, "no kwargs supported")
     irlib.assert_instance(op.func, ast.Name, "weird function call")
     # builtins
@@ -12,10 +12,10 @@ def gen_call(ctx, op, return_regn = None):
             return_regn is not None
             and len(op.args) == 1
             and isinstance(op.args[0], ast.Constant)
-            and isinstance(op.args[0].value, str)
-            , "ord builtin used incorrectly"
+            and isinstance(op.args[0].value, str),
+            "ord builtin used incorrectly",
         )
-        return [ ir.SetRegImm(return_regn, ord(op.args[0].value)) ]
+        return [ir.SetRegImm(return_regn, ord(op.args[0].value))]
     ctx.func_is_leaf = False
     argRegs = []
     argRegIr = []

@@ -1,5 +1,6 @@
 from enum import Enum
 
+
 class BaseIrObj:
     def __repr__(self):
         attrs = ""
@@ -37,7 +38,7 @@ class FuncReturnReg(BaseIrObj):
 
 
 class FuncCall(BaseIrObj):
-    def __init__(self, regn, arg_regns, return_regn = None):
+    def __init__(self, regn, arg_regns, return_regn=None):
         self.regn = regn
         self.arg_regns = arg_regns
         self.return_regn = return_regn
