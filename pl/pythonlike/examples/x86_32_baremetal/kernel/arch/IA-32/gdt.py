@@ -1,16 +1,17 @@
 ia32_gdt_arr = [
-    0, # null
-    0, # null
-    0x0000ffff, # code
-    0x00cf9a00, # code
-    0x0000ffff, # data
-    0x00cf9200, # data
+    0,  # null
+    0,  # null
+    0x0000FFFF,  # code
+    0x00CF9A00,  # code
+    0x0000FFFF,  # data
+    0x00CF9200,  # data
 ]
 
 ia32_gdtr_arr = [
-    23, # 16-bit limit (sizeof gdt -1) and first 16 bits of base pointer
-    0, # high 16 bits of base and 16 bits of nothing
+    23,  # 16-bit limit (sizeof gdt -1) and first 16 bits of base pointer
+    0,  # high 16 bits of base and 16 bits of nothing
 ]
+
 
 @export
 def ia32_gdt_init():

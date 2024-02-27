@@ -6,16 +6,17 @@ def print(s):
         s = s + 1
         c = read_byte_unaligned(s)
 
+
 @export
 def print_n_hex(n):
     kputc(ord("0"))
     kputc(ord("x"))
     # TODO: lang needs a way of knowing word size
-    i = (4*2) # 8 nibbles
+    i = 4 * 2  # 8 nibbles
     while i != 0:
-        j = (n >> (i-1)*4) & 0xF
+        j = (n >> (i - 1) * 4) & 0xF
         if j > 9:
-            kputc(ord("a") + (j-10))
+            kputc(ord("a") + (j - 10))
         else:
             kputc(ord("0") + j)
         i = i - 1

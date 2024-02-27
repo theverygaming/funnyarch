@@ -6,10 +6,11 @@ def read_byte_unaligned(ptr):
     ptr_aligned = ptr & 0xFFFFFFFC
     return (ptr_aligned[0] >> misalignment_bits) & 0xFF
 
+
 @export
 def write_byte_unaligned(ptr, data):
     misalignment_bits = (ptr & 0b11) << 3
     ptr_aligned = ptr & 0xFFFFFFFC
     data = (data & 0xFF) << misalignment_bits
-    mask = (0xFF << misalignment_bits) ^ 0xFFFFFFFF # TODO: proper NOT in lang
+    mask = (0xFF << misalignment_bits) ^ 0xFFFFFFFF  # TODO: proper NOT in lang
     ptr_aligned[0] = (ptr_aligned[0] & mask) | data
