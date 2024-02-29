@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -ffreestanding -nostdlib
 
-COMP = python3 ../../compiler.py
+COMP = python3 ../../compiler.py --target c
 
 .PHONY: all
 all: demo

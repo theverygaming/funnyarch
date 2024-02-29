@@ -1,4 +1,3 @@
-import sys
 import ast
 from dataclasses import dataclass
 import ir.lib as irlib

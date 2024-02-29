@@ -2,7 +2,7 @@ CC = i686-elf-gcc
 LD = i686-elf-ld
 CFLAGS = -O3 -nostdlib -fno-pie -mno-red-zone -ffreestanding -fno-exceptions -mno-mmx -mno-sse -mno-sse2 -Wall -Wextra -Wpedantic -Werror -Wno-unused-but-set-variable
 
-COMP = python3 ../../compiler.py
+COMP = python3 ../../compiler.py --target c
 
 .PHONY: all
 all: boot.iso
