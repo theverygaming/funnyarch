@@ -3,7 +3,12 @@ class textAreaSerialConsole {
         this.onInput = onInput;
         this.element = element;
         this.text = "";
-        addEventListener('input', this.#evInput.bind(this));
+        this.event_func = this.#evInput.bind(this);
+        addEventListener('input', this.event_func);
+    }
+
+    destroy() {
+        removeEventListener('input', this.event_func);
     }
 
     addText(str) {
