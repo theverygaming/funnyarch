@@ -172,7 +172,7 @@ str_nomem:
 .string "error: No memory detected"
 .align 4
 str_boot:
-.string "Hii hello :3"
+.string "funnyarch ROM entry"
 .align 4
 str_lowmem:
 .string "error: too little memory to boot"
