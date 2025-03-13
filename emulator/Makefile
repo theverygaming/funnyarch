@@ -6,6 +6,13 @@ CXXFLAGS_FAST = -march=native -O3
 CXXFLAGS += -Wall -Wextra $(CXXFLAGS_FAST) `$(SDL2_CONFIG) --cflags`
 LDFLAGS += `$(SDL2_CONFIG) --libs`
 else
+ifeq ($(TARGET),windows)
+CXX = x86_64-w64-mingw32-g++
+SDL2_CONFIG = sdl2-config
+CXXFLAGS_FAST = -march=native -O3
+CXXFLAGS += -Wall -Wextra $(CXXFLAGS_FAST) `$(SDL2_CONFIG) --cflags`
+LDFLAGS += `$(SDL2_CONFIG) --libs`
+else
 ifeq ($(TARGET),wasm)
 CXX = em++
 CXXFLAGS_FAST = -O3
@@ -21,6 +28,7 @@ CXXFLAGS += -Wall -Wextra -g -fprofile-arcs -ftest-coverage `$(SDL2_CONFIG) --cf
 LDFLAGS += `$(SDL2_CONFIG) --libs` -lgcov --coverage
 else
 $(error unknown TARGET)
+endif
 endif
 endif
 endif

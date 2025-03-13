@@ -2,6 +2,9 @@
 *.o
 *.bin
 
+*.exe
+*.dll
+
 *.vcd
 
 *.gcda

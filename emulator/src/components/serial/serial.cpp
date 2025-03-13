@@ -1,6 +1,8 @@
 #include <components/component.h>
 #include <cstdio>
+#ifndef _WIN32
 #include <fcntl.h>
+#endif
 #include <unistd.h>
 
 static std::pair<uint32_t, bool> serial_read_callback(uint32_t addr) {
@@ -24,7 +26,9 @@ static bool serial_write_callback(uint32_t addr, uint32_t data) {
 }
 
 static void __attribute__((constructor)) init() {
+    #ifndef _WIN32
     fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
+    #endif
 
     component::add_mmio_read_callback(serial_read_callback);
     component::add_mmio_write_callback(serial_write_callback);
