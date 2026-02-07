@@ -26,7 +26,34 @@ array_def: LBRACKET ( | (expression (COMMA expression)*)) RBRACKET
 
 pointer_index: IDENTIFIER LBRACKET expression RBRACKET
 
-expression: IDENTIFIER | SIGNED_NUMBER | pointer_index | binop
+// based on: https://en.cppreference.com/w/c/language/operator_precedence.html
+expression: logical_or
+
+logical_or: logical_and | logical_or LOGICAL_OR logical_and
+
+logical_and: bitor | logical_and LOGICAL_AND bitor
+
+bitor: bitxor | bitor BW_OR bitxor
+
+bitxor: bitand | bitxor BW_XOR bitand
+
+bitand: equality | bitand BW_AND equality
+
+equality: compare | equality CMP_EQ compare | equality CMP_NEQ compare
+
+compare: bitshift | compare CMP_LT bitshift | compare CMP_GT bitshift | compare CMP_LTEQ bitshift | compare CMP_GTEQ bitshift
+
+bitshift: sum | bitshift BW_SHIFT_LEFT sum | bitshift BW_SHIFT_RIGHT sum
+
+sum: product | sum PLUS product | sum MINUS product
+
+product: unary | product MULTIPLY unary | product DIVIDE unary | product REMAINDER unary
+
+unary: BW_NOT unary | atom
+
+atom: IDENTIFIER | SIGNED_NUMBER | pointer_index | procedure_call | LPAREN expression RPAREN | ESCAPED_STRING
+
+procedure_call: IDENTIFIER LPAREN (expression (COMMA expression)*)* RPAREN
 
 assignment: IDENTIFIER EQUALS expression SEMICOLON
 
@@ -77,6 +104,21 @@ PLUS: "+"
 MINUS: "-"
 MULTIPLY: "*"
 DIVIDE: "/"
+REMAINDER: "%"
+BW_SHIFT_LEFT: "<<"
+BW_SHIFT_RIGHT: ">>"
+BW_AND: "&"
+BW_NOT: "~"
+BW_OR: "|"
+BW_XOR: "^"
+CMP_LT: "<"
+CMP_GT: ">"
+CMP_LTEQ: "<="
+CMP_GTEQ: ">="
+CMP_EQ: "=="
+CMP_NEQ: "!="
+LOGICAL_AND: "&&"
+LOGICAL_OR: "||"
 
 // other stuff, no idea what u call this
 IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
