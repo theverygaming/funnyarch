@@ -1,0 +1,26 @@
+IMPORT "header.idkh";
+
+EXPORT VAR global_x: U8 = 123;
+
+EXPORT PROCEDURE strlen(str: POINTER TO U8): USIZE;
+VARS
+    len: USIZE;
+BEGIN
+    len = 0;
+    WHILE str[len] DO
+        len = len + 1;
+    DONE
+    RETURN len;
+END
+
+EXPORT PROCEDURE set_global(val: U8, val2: U16): VOID;
+BEGIN
+    global_x = val;
+    IF val == 5 THEN
+        global_x = val + 10;
+    ELSIF val == 6 THEN
+        global_x = val + 10;
+    ELSE
+        global_x = 20;
+    END
+END

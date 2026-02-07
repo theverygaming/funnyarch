@@ -1,0 +1,2 @@
+EXTERN PROCEDURE strlen(str: POINTER TO U8): USIZE;
+EXTERN VAR global_x: U8;

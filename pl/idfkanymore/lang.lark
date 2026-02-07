@@ -1,0 +1,88 @@
+
+?start: (import_stmt | globalvar | procedure_def)* 
+
+// core language
+
+globalvar: EXPORT? VAR IDENTIFIER COLON type EQUALS (expression | array_def) SEMICOLON
+
+import_stmt: IMPORT string SEMICOLON
+
+procedure_def: EXPORT? procedure_prototype procedure_def_vars? BEGIN block END
+
+procedure_prototype: PROCEDURE IDENTIFIER LPAREN procedure_def_args RPAREN COLON IDENTIFIER SEMICOLON
+procedure_def_args: procedure_def_arg (COMMA procedure_def_arg)*
+procedure_def_arg: IDENTIFIER COLON type
+
+procedure_def_vars: VARS procedure_def_var*
+procedure_def_var: IDENTIFIER COLON type SEMICOLON
+
+type: IDENTIFIER | POINTER TO IDENTIFIER | ARRAY LBRACKET NUMBER RBRACKET OF IDENTIFIER
+
+array_def: LBRACKET ( | (expression (COMMA expression)*)) RBRACKET
+
+pointer_index: IDENTIFIER LBRACKET expression RBRACKET
+
+expression: IDENTIFIER | SIGNED_NUMBER | pointer_index | binop
+
+assignment: IDENTIFIER EQUALS expression SEMICOLON
+
+return: RETURN expression SEMICOLON
+
+while: WHILE expression DO block DONE
+
+if: IF expression THEN block (ELSIF expression THEN block)* (ELSE block)? END
+
+statement: assignment | return | while | if
+
+block: statement*
+
+// keywords and terms and stuff
+
+// keywords
+IMPORT: "IMPORT"
+EXTERN: "EXTERN"
+EXPORT: "EXPORT"
+VAR: "VAR"
+PROCEDURE: "PROCEDURE"
+VARS: "VARS"
+BEGIN: "BEGIN"
+END: "END"
+WHILE: "WHILE"
+DO: "DO"
+DONE: "DONE"
+IF: "IF"
+THEN: "THEN"
+ELSIF: "ELSIF"
+ELSE: "ELSE"
+RETURN: "RETURN"
+POINTER: "POINTER"
+TO: "TO"
+ARRAY: "ARRAY"
+OF: "OF"
+
+// simple terms
+SEMICOLON: ";"
+COLON: ":"
+COMMA: ","
+LPAREN: "("
+RPAREN: ")"
+LBRACKET: "["
+RBRACKET: "]"
+EQUALS: "="
+PLUS: "+"
+MINUS: "-"
+MULTIPLY: "*"
+DIVIDE: "/"
+
+// other stuff, no idea what u call this
+IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
+string: ESCAPED_STRING
+
+// imports etc.
+
+%import common.ESCAPED_STRING
+%import common.SIGNED_NUMBER
+%import common.NUMBER
+%import common.WS
+
+%ignore WS
