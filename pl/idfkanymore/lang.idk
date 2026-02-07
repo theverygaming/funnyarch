@@ -23,4 +23,5 @@ BEGIN
     ELSE
         global_x = 20;
     END
+    global_x = global_x + strlen("hello world");
 END

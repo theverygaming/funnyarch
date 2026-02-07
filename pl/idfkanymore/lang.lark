@@ -1,11 +1,15 @@
-
-?start: (import_stmt | globalvar | procedure_def)* 
+?start: (import_stmt | globalvar | procedure_def)*
+?start_header: (import_stmt | globalvar_decl | procedure_decl)*
 
 // core language
 
 globalvar: EXPORT? VAR IDENTIFIER COLON type EQUALS (expression | array_def) SEMICOLON
 
+globalvar_decl: EXTERN VAR IDENTIFIER COLON type SEMICOLON
+
 import_stmt: IMPORT string SEMICOLON
+
+procedure_decl: EXTERN procedure_prototype
 
 procedure_def: EXPORT? procedure_prototype procedure_def_vars? BEGIN block END
 

@@ -1,7 +1,11 @@
 import lark
 
 s = open("lang.idk", "r").read()
-
 parser = lark.Lark.open("lang.lark", start="start", parser="lalr")
+tree = parser.parse(s)
+print(tree.pretty())
+
+s = open("header.idkh", "r").read()
+parser = lark.Lark.open("lang.lark", start="start_header", parser="lalr")
 tree = parser.parse(s)
 print(tree.pretty())
