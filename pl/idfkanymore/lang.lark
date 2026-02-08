@@ -29,29 +29,53 @@ pointer_index: IDENTIFIER LBRACKET expression RBRACKET
 // based on: https://en.cppreference.com/w/c/language/operator_precedence.html
 expression: logical_or
 
-logical_or: logical_and | logical_or LOGICAL_OR logical_and
+?logical_or: logical_and
+           | logical_or LOGICAL_OR logical_and -> binop
 
-logical_and: bitor | logical_and LOGICAL_AND bitor
+?logical_and: bitor
+            | logical_and LOGICAL_AND bitor -> binop
 
-bitor: bitxor | bitor BW_OR bitxor
+?bitor: bitxor
+      | bitor BW_OR bitxor -> binop
 
-bitxor: bitand | bitxor BW_XOR bitand
+?bitxor: bitand
+       | bitxor BW_XOR bitand -> binop
 
-bitand: equality | bitand BW_AND equality
+?bitand: equality
+       | bitand BW_AND equality -> binop
 
-equality: compare | equality CMP_EQ compare | equality CMP_NEQ compare
+?equality: compare 
+         | equality CMP_EQ compare -> cmp
+         | equality CMP_NEQ compare -> cmp
 
-compare: bitshift | compare CMP_LT bitshift | compare CMP_GT bitshift | compare CMP_LTEQ bitshift | compare CMP_GTEQ bitshift
+?compare: bitshift
+        | compare CMP_LT bitshift -> cmp
+        | compare CMP_GT bitshift -> cmp
+        | compare CMP_LTEQ bitshift -> cmp
+        | compare CMP_GTEQ bitshift -> cmp
 
-bitshift: sum | bitshift BW_SHIFT_LEFT sum | bitshift BW_SHIFT_RIGHT sum
+?bitshift: sum
+         | bitshift BW_SHIFT_LEFT sum -> binop
+         | bitshift BW_SHIFT_RIGHT sum -> binop
 
-sum: product | sum PLUS product | sum MINUS product
+?sum: product
+    | sum PLUS product -> binop
+    | sum MINUS product -> binop
 
-product: unary | product MULTIPLY unary | product DIVIDE unary | product REMAINDER unary
+?product: unary
+        | product MULTIPLY unary -> binop
+        | product DIVIDE unary -> binop
+        | product REMAINDER unary -> binop
 
-unary: BW_NOT unary | atom
+?unary: atom
+      | BW_NOT unary -> unaryop
 
-atom: IDENTIFIER | SIGNED_NUMBER | pointer_index | procedure_call | LPAREN expression RPAREN | string
+?atom: IDENTIFIER
+     | SIGNED_NUMBER
+     | pointer_index
+     | procedure_call
+     | LPAREN expression RPAREN
+     | string
 
 procedure_call: IDENTIFIER LPAREN (expression (COMMA expression)*)* RPAREN
 
