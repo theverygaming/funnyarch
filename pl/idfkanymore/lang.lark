@@ -3,28 +3,28 @@
 
 // core language
 
-globalvar: EXPORT? VAR IDENTIFIER COLON type EQUALS (expression | array_def) SEMICOLON
+globalvar: _EXPORT? _VAR IDENTIFIER _COLON type _EQUALS (expression | array_def) _SEMICOLON
 
-globalvar_decl: EXTERN VAR IDENTIFIER COLON type SEMICOLON
+globalvar_decl: _EXTERN _VAR IDENTIFIER _COLON type _SEMICOLON
 
-import_stmt: IMPORT string SEMICOLON
+import_stmt: _IMPORT string _SEMICOLON
 
-procedure_decl: EXTERN procedure_prototype
+procedure_decl: _EXTERN procedure_prototype
 
-procedure_def: EXPORT? procedure_prototype procedure_def_vars? BEGIN block END
+procedure_def: _EXPORT? procedure_prototype procedure_def_vars? _BEGIN block _END
 
-procedure_prototype: PROCEDURE IDENTIFIER LPAREN procedure_def_args RPAREN COLON IDENTIFIER SEMICOLON
-procedure_def_args: procedure_def_arg (COMMA procedure_def_arg)*
-procedure_def_arg: IDENTIFIER COLON type
+procedure_prototype: _PROCEDURE IDENTIFIER _LPAREN procedure_def_args _RPAREN _COLON IDENTIFIER _SEMICOLON
+procedure_def_args: procedure_def_arg (_COMMA procedure_def_arg)*
+procedure_def_arg: IDENTIFIER _COLON type
 
-procedure_def_vars: VARS procedure_def_var*
-procedure_def_var: IDENTIFIER COLON type SEMICOLON
+procedure_def_vars: _VARS procedure_def_var*
+procedure_def_var: IDENTIFIER _COLON type _SEMICOLON
 
-type: IDENTIFIER | POINTER TO IDENTIFIER | ARRAY LBRACKET NUMBER RBRACKET OF IDENTIFIER
+type: IDENTIFIER | _POINTER _TO IDENTIFIER | _ARRAY _LBRACKET NUMBER _RBRACKET _OF IDENTIFIER
 
-array_def: LBRACKET ( | (expression (COMMA expression)*)) RBRACKET
+array_def: _LBRACKET ( | (expression (_COMMA expression)*)) _RBRACKET
 
-pointer_index: IDENTIFIER LBRACKET expression RBRACKET
+pointer_index: IDENTIFIER _LBRACKET expression _RBRACKET
 
 // based on: https://en.cppreference.com/w/c/language/operator_precedence.html
 expression: logical_or
@@ -74,18 +74,22 @@ expression: logical_or
      | SIGNED_NUMBER
      | pointer_index
      | procedure_call
-     | LPAREN expression RPAREN
+     | _LPAREN expression _RPAREN
      | string
 
-procedure_call: IDENTIFIER LPAREN (expression (COMMA expression)*)* RPAREN
+procedure_call: IDENTIFIER _LPAREN (expression (_COMMA expression)*)* _RPAREN
 
-assignment: IDENTIFIER EQUALS expression SEMICOLON
+assignment: IDENTIFIER _EQUALS expression _SEMICOLON
 
-return: RETURN expression SEMICOLON
+return: _RETURN expression _SEMICOLON
 
-while: WHILE expression DO block DONE
+while: _WHILE expression _DO block _DONE
 
-if: IF expression THEN block (ELSIF expression THEN block)* (ELSE block)? END
+if: _IF expression _THEN block if_elsif if_else _END
+
+if_elsif: (_ELSIF expression _THEN block)*
+
+if_else: (_ELSE block)?
 
 statement: assignment | return | while | if
 
@@ -94,36 +98,36 @@ block: statement*
 // keywords and terms and stuff
 
 // keywords
-IMPORT: "IMPORT"
-EXTERN: "EXTERN"
-EXPORT: "EXPORT"
-VAR: "VAR"
-PROCEDURE: "PROCEDURE"
-VARS: "VARS"
-BEGIN: "BEGIN"
-END: "END"
-WHILE: "WHILE"
-DO: "DO"
-DONE: "DONE"
-IF: "IF"
-THEN: "THEN"
-ELSIF: "ELSIF"
-ELSE: "ELSE"
-RETURN: "RETURN"
-POINTER: "POINTER"
-TO: "TO"
-ARRAY: "ARRAY"
-OF: "OF"
+_IMPORT: "IMPORT"
+_EXTERN: "EXTERN"
+_EXPORT: "EXPORT"
+_VAR: "VAR"
+_PROCEDURE: "PROCEDURE"
+_VARS: "VARS"
+_BEGIN: "BEGIN"
+_END: "END"
+_WHILE: "WHILE"
+_DO: "DO"
+_DONE: "DONE"
+_IF: "IF"
+_THEN: "THEN"
+_ELSIF: "ELSIF"
+_ELSE: "ELSE"
+_RETURN: "RETURN"
+_POINTER: "POINTER"
+_TO: "TO"
+_ARRAY: "ARRAY"
+_OF: "OF"
 
 // simple terms
-SEMICOLON: ";"
-COLON: ":"
-COMMA: ","
-LPAREN: "("
-RPAREN: ")"
-LBRACKET: "["
-RBRACKET: "]"
-EQUALS: "="
+_SEMICOLON: ";"
+_COLON: ":"
+_COMMA: ","
+_LPAREN: "("
+_RPAREN: ")"
+_LBRACKET: "["
+_RBRACKET: "]"
+_EQUALS: "="
 PLUS: "+"
 MINUS: "-"
 MULTIPLY: "*"

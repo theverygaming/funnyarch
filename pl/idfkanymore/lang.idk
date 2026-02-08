@@ -19,7 +19,9 @@ BEGIN
     IF val == 5 THEN
         global_x = val + 10;
     ELSIF val == 6 THEN
-        global_x = val + 10;
+        global_x = val + 11;
+    ELSIF val == 9 THEN
+        global_x = val + 12;
     ELSE
         global_x = 20;
     END
