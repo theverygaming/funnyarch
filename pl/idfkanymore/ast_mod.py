@@ -62,6 +62,7 @@ class Type(_Ast):
 
 @dataclasses.dataclass
 class Globalvar(_Ast):
+    # FIXME: visibility (export?)
     name: str
     type_: Type
     value: Expression
@@ -70,6 +71,15 @@ class Globalvar(_Ast):
         self.name = name.name
         self.type_ = type_
         self.value = value
+
+@dataclasses.dataclass
+class GlobalvarDecl(_Ast):
+    name: str
+    type_: Type
+
+    def __init__(self, name: Identifier, type_: Type):
+        self.name = name.name
+        self.type_ = type_
 
 @dataclasses.dataclass
 class Block(_Ast, lark.ast_utils.AsList):
@@ -107,6 +117,7 @@ class ProcedureDefVar(_Ast):
 
 @dataclasses.dataclass
 class ProcedureDef(_Ast):
+    # FIXME: visibility (export?)
     prototype: ProcedurePrototype
     vars_: list[ProcedureDefVar]
     code: Block
@@ -115,6 +126,13 @@ class ProcedureDef(_Ast):
         self.prototype = args[0]
         self.vars_ = args[1:-1]
         self.code = args[-1]
+
+@dataclasses.dataclass
+class ProcedureDecl(_Ast):
+    prototype: ProcedurePrototype
+
+    def __init__(self, *args):
+        self.prototype = args[0]
 
 @dataclasses.dataclass
 class PointerIndex(Expression):
@@ -223,4 +241,8 @@ class ToAst(lark.Transformer):
 
     @lark.v_args(inline=True)
     def start(self, *args):
+        return args
+    
+    @lark.v_args(inline=True)
+    def start_header(self, *args):
         return args
