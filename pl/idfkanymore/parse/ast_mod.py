@@ -137,12 +137,12 @@ class ProcedureDef(_Ast):
     # FIXME: visibility (export?)
     prototype: ProcedurePrototype
     vars_: list[ProcedureDefVar]
-    code: Block
+    block: Block
 
     def __init__(self, *args):
         self.prototype = args[0]
         self.vars_ = args[1:-1]
-        self.code = args[-1]
+        self.block = args[-1]
 
 @dataclasses.dataclass
 class ProcedureDecl(_Ast):
@@ -212,7 +212,7 @@ class If(Statement):
 @dataclasses.dataclass
 class While(Statement):
     cond: Expression
-    code: Block
+    block: Block
 
 @dataclasses.dataclass
 class Binop(Expression):
