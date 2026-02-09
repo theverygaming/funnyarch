@@ -2,7 +2,9 @@ IMPORT "header.idkh";
 
 EXPORT VAR global_x: U8 = (((1 * 20) + 4) | 1) << 1;
 
-EXPORT VAR global_arr: ARRAY[3] OF POINTER TO U8 = ["s1", "s2", "s3"];
+//EXPORT VAR global_arr: ARRAY[3] OF POINTER TO U8 = ["s1", "s2", "s3"]; // FIXME: support
+
+EXPORT VAR global_y: U8 = 1;
 
 EXPORT PROCEDURE strlen(str: POINTER TO U8): USIZE;
 VARS
@@ -15,7 +17,7 @@ BEGIN
     RETURN len;
 END
 
-EXPORT PROCEDURE set_global(val: U8, val2: U16): VOID;
+EXPORT PROCEDURE set_global(val: U8, val2: U16): VOID; // silly test function
 BEGIN
     global_x = val;
     IF val == 5 THEN
@@ -29,5 +31,5 @@ BEGIN
     END
     global_x = global_x + strlen("hello world");
     strlen("123");
-    global_x[0] = 5;
+    //global_x[0] = 5; // FIXME: support
 END

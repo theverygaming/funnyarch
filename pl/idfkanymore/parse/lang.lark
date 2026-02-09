@@ -150,6 +150,7 @@ LOGICAL_OR: "||"
 
 // other stuff, no idea what u call this
 IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
+COMMENT: "//" /[^\n]/*
 
 // imports etc.
 
@@ -159,3 +160,4 @@ IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
 %import common.WS
 
 %ignore WS
+%ignore COMMENT
