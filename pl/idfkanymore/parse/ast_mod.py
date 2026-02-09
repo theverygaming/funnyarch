@@ -1,3 +1,4 @@
+from typing import Union
 import dataclasses
 import lark
 import lark.tree
@@ -53,21 +54,43 @@ class Variable(Identifier, Expression):
     def __init__(self, name: Identifier):
         self.name = name.name
 
+class TypeBase(_Ast):
+    def is_ptr(self):
+        raise NotImplementedError()
+
 @dataclasses.dataclass
-class Type(_Ast):
+class TypeName(TypeBase):
     name: str
 
     def __init__(self, name: Identifier):
         self.name = name.name
 
+    def is_ptr(self):
+        return False
+
+    @property
+    def pointing_to():
+        raise Exception("pointing_to doesn't work on normal type")
+
+@dataclasses.dataclass
+class TypePointer(TypeBase):
+    pointing_to: TypeBase
+
+    @property
+    def name():
+        raise Exception("name doesn't work on pointer type")
+
+    def is_ptr(self):
+        return True
+
 @dataclasses.dataclass
 class Globalvar(_Ast):
     # FIXME: visibility (export?)
     name: str
-    type_: Type
+    type_: TypeBase
     value: Expression
 
-    def __init__(self, name: Identifier, type_: Type, value: Expression):
+    def __init__(self, name: Identifier, type_: TypeBase, value: Expression):
         self.name = name.name
         self.type_ = type_
         self.value = value
@@ -75,9 +98,9 @@ class Globalvar(_Ast):
 @dataclasses.dataclass
 class GlobalvarDecl(_Ast):
     name: str
-    type_: Type
+    type_: TypeBase
 
-    def __init__(self, name: Identifier, type_: Type):
+    def __init__(self, name: Identifier, type_: TypeBase):
         self.name = name.name
         self.type_ = type_
 
@@ -89,9 +112,9 @@ class Block(_Ast, lark.ast_utils.AsList):
 @dataclasses.dataclass
 class ProcedurePrototypeArg(_Ast):
     name: str
-    type_: Type
+    type_: TypeBase
 
-    def __init__(self, name: Identifier, type_: Type):
+    def __init__(self, name: Identifier, type_: TypeBase):
         self.name = name.name
         self.type_ = type_
 
@@ -99,7 +122,7 @@ class ProcedurePrototypeArg(_Ast):
 class ProcedurePrototype(_Ast):
     name: str
     args: list[ProcedurePrototypeArg]
-    return_type: Type
+    return_type: TypeBase
 
     def __init__(self, *args):
         self.name = args[0].name
@@ -109,9 +132,9 @@ class ProcedurePrototype(_Ast):
 @dataclasses.dataclass
 class ProcedureDefVar(_Ast):
     name: str
-    type_: Type
+    type_: TypeBase
 
-    def __init__(self, name: Identifier, type_: Type):
+    def __init__(self, name: Identifier, type_: TypeBase):
         self.name = name.name
         self.type_ = type_
 

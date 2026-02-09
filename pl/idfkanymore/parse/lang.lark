@@ -18,7 +18,9 @@ procedure_prototype_arg: IDENTIFIER _COLON type
 
 procedure_def_var: IDENTIFIER _COLON type _SEMICOLON
 
-type: IDENTIFIER | _POINTER _TO IDENTIFIER | _ARRAY _LBRACKET NUMBER _RBRACKET _OF IDENTIFIER
+?type: type_pointer | type_name
+type_name: IDENTIFIER
+type_pointer: _POINTER _TO type
 
 array_def: _LBRACKET ( | (expression (_COMMA expression)*)) _RBRACKET
 
