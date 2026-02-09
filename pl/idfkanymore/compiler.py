@@ -1,8 +1,8 @@
 import argparse
 import pathlib
-#import ir.irgen as irgen
+from .ir import irgen
 #import backend
-from parse import parse
+from .parse import parse
 
 
 parser = argparse.ArgumentParser(description="Weird compiler")
@@ -29,9 +29,9 @@ with open(args.infilename, "r", encoding="utf-8") as f:
 
     ctx = irgen.IrGenContext()
     for node in astnodes:
-        ir += irgen.gen_ast_node(ctx, node)
+        ir += ctx.gen_ast_node( node)
 
-    ir = irgen.gen_global_vars(ctx) + ir
+    ir = ctx.gen_global_vars() + ir
 
     asm = target_be.gen_assembly(ir)
     with open(args.out, "w", encoding="utf-8") as f:
@@ -49,4 +49,7 @@ with open(args.infilename, "r", encoding="utf-8") as f:
             return f.read()
 
     ast = parse.full_ast(f.read(), _import)
-    print(ast)
+
+    ir = irgen.IrGenContext.from_ast(ast)
+    print("\n")
+    print(ir)
