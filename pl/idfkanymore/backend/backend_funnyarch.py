@@ -23,6 +23,27 @@ class BackendFunnyarch(backends.Backend):
                         write_l(F".byte 0x{b:x}")
                 else:
                     raise Exception(f"encountered unknown datatype {inst.type_}")
-                continue
-            raise Exception(f"unknown IR instr {inst}")
+            elif isinstance(inst, ir.Function):
+                asm += self._gen_assembly_fn(inst)
+                asm += "\n\n"
+            else:
+                raise Exception(f"unknown IR instr {inst}")
+        return asm
+
+    def _gen_assembly_fn(self, fn_inst):
+        asm = ""
+
+        def write_l(s):
+            nonlocal asm
+            asm += "  " + s + "\n"
+
+        for inst in fn_inst.body:
+            write_l(f"// IR: {inst}")
+            # if isinstance(inst, ir.GlobalVarDef):
+            # else:
+            #     raise Exception(f"unknown IR instr {inst}")
+
+        # TODO: this can be dead code, we should check if it is!
+        write_l("mov rip, lr")
+
         return asm

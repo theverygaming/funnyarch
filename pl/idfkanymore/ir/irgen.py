@@ -23,16 +23,23 @@ class IrGenContext:
         "I16": ir.DatatypeSimpleInteger(16, True),
         "U32": ir.DatatypeSimpleInteger(32, False),
         "I32": ir.DatatypeSimpleInteger(32, True),
+
+        "USIZE": ir.DatatypeSimpleInteger(32, False),
+
+        "VOID": None,
     }
     globalvars = {}
-    func_locals = None
-    func_is_leaf = False
-    _vreg_counter = -1
-    _label_counter = -1
+
     _global_counter = -1
-    closestLoopEscapeLabel = None
-    closestLoopContinueLabel = None
     depth = 0
+
+    # specific when inside procedures
+    proc_locals = None
+    proc_is_leaf = False
+    proc_vreg_counter = -1
+    proc_label_counter = -1
+    proc_closest_loop_escape_label = None
+    proc_closest_loop_continue_label = None
 
     def alloc_vreg(self):
         self._vreg_counter += 1
@@ -42,6 +49,15 @@ class IrGenContext:
         self._label_counter += 1
         return self._label_counter
     
+    def lookup_type(self, ast_type):
+        if isinstance(ast_type, ast_mod.TypeName):
+            return self.datatypes[ast_type.name]
+        elif isinstance(ast_type, ast_mod.TypePointer):
+            return ir.DatatypePointer(self.lookup_type(ast_type.pointing_to))
+        elif isinstance(ast_type, ast_mod.TypeArray):
+            return ir.DatatypeArray(self.lookup_type(ast_type.member_type), ast_type.size)
+        raise Exception(f"could not find type {ast_type}")
+
     def gen_ast_node(self, node, parent_nodes=None):
         if parent_nodes is None:
             parent_nodes = []
@@ -96,6 +112,6 @@ class IrGenContext:
         for node in ast:
             ir += ctx.gen_ast_node(node)
 
-        ir = ctx.gen_global_vars() + ir
+        ir = ir + ctx.gen_global_vars()
 
         return ir

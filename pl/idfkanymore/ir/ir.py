@@ -46,12 +46,13 @@ class GlobalVarDef(IrInstrObj):
 
 @dataclasses.dataclass
 class Function(IrInstrObj):
-    export: bool
     name: str
     leaf: bool
+    args: list[tuple[str, Datatype]]
+    return_type: Datatype
     regs: dict[int, Datatype]
-    args: list[Datatype]
     body: list[IrInstrObj]
+    export: bool
 
 
 @dataclasses.dataclass
@@ -140,7 +141,7 @@ class GetGlobalPtr(IrInstrObj):
 @dataclasses.dataclass
 class GetArgPtr(IrInstrObj):
     regid_ptr_dst: int
-    arg_idx: int
+    arg_name: str
 
 
 @dataclasses.dataclass
