@@ -3,31 +3,29 @@
 
 // core language
 
-globalvar: _EXPORT? _VAR IDENTIFIER _COLON type _EQUALS (expression | array_def) _SEMICOLON
+globalvar: _EXPORT? _VAR variable _COLON type _EQUALS (expression | array_def) _SEMICOLON
 
-globalvar_decl: _EXTERN _VAR IDENTIFIER _COLON type _SEMICOLON
+globalvar_decl: _EXTERN _VAR variable _COLON type _SEMICOLON
 
-import_stmt: _IMPORT string _SEMICOLON
+import_stmt: _IMPORT ESCAPED_STRING _SEMICOLON
 
 procedure_decl: _EXTERN procedure_prototype
 
-procedure_def: _EXPORT? procedure_prototype procedure_def_vars? _BEGIN block _END
+procedure_def: _EXPORT? procedure_prototype (_VARS procedure_def_var*)? _BEGIN block _END
 
-procedure_prototype: _PROCEDURE IDENTIFIER _LPAREN procedure_def_args _RPAREN _COLON IDENTIFIER _SEMICOLON
-procedure_def_args: procedure_def_arg (_COMMA procedure_def_arg)*
-procedure_def_arg: IDENTIFIER _COLON type
+procedure_prototype: _PROCEDURE IDENTIFIER _LPAREN (procedure_prototype_arg (_COMMA procedure_prototype_arg)*)? _RPAREN _COLON type _SEMICOLON
+procedure_prototype_arg: IDENTIFIER _COLON type
 
-procedure_def_vars: _VARS procedure_def_var*
 procedure_def_var: IDENTIFIER _COLON type _SEMICOLON
 
 type: IDENTIFIER | _POINTER _TO IDENTIFIER | _ARRAY _LBRACKET NUMBER _RBRACKET _OF IDENTIFIER
 
 array_def: _LBRACKET ( | (expression (_COMMA expression)*)) _RBRACKET
 
-pointer_index: IDENTIFIER _LBRACKET expression _RBRACKET
+pointer_index: variable _LBRACKET expression _RBRACKET
 
 // based on: https://en.cppreference.com/w/c/language/operator_precedence.html
-expression: logical_or
+?expression: logical_or
 
 ?logical_or: logical_and
            | logical_or LOGICAL_OR logical_and -> binop
@@ -45,14 +43,14 @@ expression: logical_or
        | bitand BW_AND equality -> binop
 
 ?equality: compare 
-         | equality CMP_EQ compare -> cmp
-         | equality CMP_NEQ compare -> cmp
+         | equality CMP_EQ compare -> comparison
+         | equality CMP_NEQ compare -> comparison
 
 ?compare: bitshift
-        | compare CMP_LT bitshift -> cmp
-        | compare CMP_GT bitshift -> cmp
-        | compare CMP_LTEQ bitshift -> cmp
-        | compare CMP_GTEQ bitshift -> cmp
+        | compare CMP_LT bitshift -> comparison
+        | compare CMP_GT bitshift -> comparison
+        | compare CMP_LTEQ bitshift -> comparison
+        | compare CMP_GTEQ bitshift -> comparison
 
 ?bitshift: sum
          | bitshift BW_SHIFT_LEFT sum -> binop
@@ -70,28 +68,27 @@ expression: logical_or
 ?unary: atom
       | BW_NOT unary -> unaryop
 
-?atom: IDENTIFIER
-     | SIGNED_NUMBER
+?atom: variable
      | pointer_index
      | procedure_call
      | _LPAREN expression _RPAREN
-     | string
+     | constant
+
+variable: IDENTIFIER
+
+constant: SIGNED_INT | ESCAPED_STRING
 
 procedure_call: IDENTIFIER _LPAREN (expression (_COMMA expression)*)* _RPAREN
 
-assignment: IDENTIFIER _EQUALS expression _SEMICOLON
+assignment: (IDENTIFIER | pointer_index) _EQUALS expression _SEMICOLON
 
 return: _RETURN expression _SEMICOLON
 
 while: _WHILE expression _DO block _DONE
 
-if: _IF expression _THEN block if_elsif if_else _END
+if: _IF expression _THEN block (_ELSIF expression _THEN block)* (_ELSE block)? _END
 
-if_elsif: (_ELSIF expression _THEN block)*
-
-if_else: (_ELSE block)?
-
-statement: assignment | return | while | if
+?statement: assignment | return | while | if | (procedure_call _SEMICOLON)
 
 block: statement*
 
@@ -150,12 +147,11 @@ LOGICAL_OR: "||"
 
 // other stuff, no idea what u call this
 IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
-string: ESCAPED_STRING
 
 // imports etc.
 
 %import common.ESCAPED_STRING
-%import common.SIGNED_NUMBER
+%import common.SIGNED_INT
 %import common.NUMBER
 %import common.WS
 

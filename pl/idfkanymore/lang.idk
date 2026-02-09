@@ -23,7 +23,9 @@ BEGIN
     ELSIF val == 9 THEN
         global_x = val + 12;
     ELSE
-        global_x = 20;
+        global_x = ~20;
     END
     global_x = global_x + strlen("hello world");
+    strlen("123");
+    global_x[0] = 5;
 END
