@@ -1,7 +1,7 @@
 import argparse
 import pathlib
 from .ir import irgen
-#import backend
+from .backend import backends
 from .parse import parse
 
 
@@ -38,6 +38,12 @@ with open(args.infilename, "r", encoding="utf-8") as f:
         f.write(asm)
 """
 
+target_be = backends.get_backend(args.target)
+if target_be is None:
+    raise Exception(f"Backend '{args.target}' not found")
+else:
+    target_be = target_be()
+
 with open(args.infilename, "r", encoding="utf-8") as f:
     prev_imported_paths = set()
     def _import(name):
@@ -53,3 +59,9 @@ with open(args.infilename, "r", encoding="utf-8") as f:
     ir = irgen.IrGenContext.from_ast(ast)
     print("\n")
     print(ir)
+
+    asm = target_be.gen_assembly(ir)
+    print("\n")
+    print(asm)
+    #with open(args.out, "w", encoding="utf-8") as f:
+    #    f.write(asm)
