@@ -112,8 +112,13 @@ class JumpLocalLabel(IrInstrObj):
 @dataclasses.dataclass
 class SetRegImm(IrInstrObj):
     regid: int
-    type_: Datatype
     value: object
+
+
+@dataclasses.dataclass
+class CopyReg(IrInstrObj):
+    regid_src: int
+    regid_dst: int
 
 
 @dataclasses.dataclass
@@ -148,12 +153,6 @@ class GetArgPtr(IrInstrObj):
 class GetFnPtr(IrInstrObj):
     regid_ptr_dst: int
     name: str
-
-
-@dataclasses.dataclass
-class CopyReg(IrInstrObj):
-    regid_src: int
-    regid_dst: int
 
 
 class BinaryOperator(BaseIrObj, enum.Enum):

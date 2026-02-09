@@ -35,20 +35,22 @@ class IrGenContext:
 
     # specific when inside procedures
     proc_locals = None
-    proc_is_leaf = False
-    proc_vreg_counter = -1
-    proc_label_counter = -1
+    proc_is_leaf = None
+    proc_vreg_counter = None
+    proc_regs = None
+    proc_label_counter = None
     proc_closest_loop_escape_label = None
     proc_closest_loop_continue_label = None
 
-    def alloc_vreg(self):
-        self._vreg_counter += 1
-        return self._vreg_counter
+    def alloc_vreg(self, t):
+        self.proc_vreg_counter += 1
+        self.proc_regs[self.proc_vreg_counter] = t
+        return self.proc_vreg_counter
 
     def alloc_label(self):
-        self._label_counter += 1
-        return self._label_counter
-    
+        self.proc_label_counter += 1
+        return self.proc_label_counter
+
     def lookup_type(self, ast_type):
         if isinstance(ast_type, ast_mod.TypeName):
             return self.datatypes[ast_type.name]
@@ -85,7 +87,7 @@ class IrGenContext:
                 parser_matches = nl_match_cls(cl, next_parent_nodes)
             else:
                 parser_matches = nl_match_cls(cl, next_parent_nodes[-len(cl):])
-            if nl_match_cls(cl, next_parent_nodes):
+            if parser_matches:
                 data = fn(self, node, lambda x: self.gen_ast_node(x, next_parent_nodes))
                 if isinstance(data, list):
                     return data
