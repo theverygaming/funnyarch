@@ -241,8 +241,8 @@ class ToAst(lark.Transformer):
 
     @lark.v_args(inline=True)
     def start(self, *args):
-        return args
+        return list(args)
     
     @lark.v_args(inline=True)
     def start_header(self, *args):
-        return args
+        return list(args)

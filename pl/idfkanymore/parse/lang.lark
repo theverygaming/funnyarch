@@ -1,5 +1,5 @@
-?start: (import_stmt | globalvar | procedure_def)*
-?start_header: (import_stmt | globalvar_decl | procedure_decl)*
+start: (import_stmt | globalvar | procedure_def)*
+start_header: (import_stmt | globalvar_decl | procedure_decl)*
 
 // core language
 

@@ -1,4 +1,5 @@
 import argparse
+import pathlib
 #import ir.irgen as irgen
 #import backend
 from parse import parse
@@ -38,5 +39,14 @@ with open(args.infilename, "r", encoding="utf-8") as f:
 """
 
 with open(args.infilename, "r", encoding="utf-8") as f:
-    ast = parse.to_ast(f.read())
+    prev_imported_paths = set()
+    def _import(name):
+        p = (pathlib.Path(args.infilename).parent / name).resolve(strict=True)
+        if p in prev_imported_paths:
+            return ""
+        prev_imported_paths.add(p)
+        with open(p, "r", encoding="utf-8") as f:
+            return f.read()
+
+    ast = parse.full_ast(f.read(), _import)
     print(ast)
