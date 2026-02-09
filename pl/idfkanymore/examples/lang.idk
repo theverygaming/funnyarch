@@ -2,6 +2,8 @@ IMPORT "header.idkh";
 
 EXPORT VAR global_x: U8 = (((1 * 20) + 4) | 1) << 1;
 
+EXPORT VAR global_arr: ARRAY[3] OF POINTER TO U8 = ["s1", "s2", "s3"];
+
 EXPORT PROCEDURE strlen(str: POINTER TO U8): USIZE;
 VARS
     len: USIZE;

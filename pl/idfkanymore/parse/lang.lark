@@ -18,11 +18,12 @@ procedure_prototype_arg: IDENTIFIER _COLON type
 
 procedure_def_var: IDENTIFIER _COLON type _SEMICOLON
 
-?type: type_pointer | type_name
+?type: type_pointer | type_name | type_array
 type_name: IDENTIFIER
 type_pointer: _POINTER _TO type
+type_array: _ARRAY _LBRACKET NUMBER _RBRACKET _OF type
 
-array_def: _LBRACKET ( | (expression (_COMMA expression)*)) _RBRACKET
+array_def: _LBRACKET (expression (_COMMA expression)*)? _RBRACKET
 
 pointer_index: variable _LBRACKET expression _RBRACKET
 

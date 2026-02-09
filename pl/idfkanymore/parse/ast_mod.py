@@ -55,8 +55,7 @@ class Variable(Identifier, Expression):
         self.name = name.name
 
 class TypeBase(_Ast):
-    def is_ptr(self):
-        raise NotImplementedError()
+    pass
 
 @dataclasses.dataclass
 class TypeName(TypeBase):
@@ -65,23 +64,18 @@ class TypeName(TypeBase):
     def __init__(self, name: Identifier):
         self.name = name.name
 
-    def is_ptr(self):
-        return False
-
-    @property
-    def pointing_to():
-        raise Exception("pointing_to doesn't work on normal type")
-
 @dataclasses.dataclass
 class TypePointer(TypeBase):
     pointing_to: TypeBase
 
-    @property
-    def name():
-        raise Exception("name doesn't work on pointer type")
+@dataclasses.dataclass
+class TypeArray(TypeBase):
+    size: int
+    member_type: TypeBase
 
-    def is_ptr(self):
-        return True
+    def __init__(self, size, member_type):
+        self.size = int(size)
+        self.member_type = member_type
 
 @dataclasses.dataclass
 class Globalvar(_Ast):
@@ -165,6 +159,13 @@ class PointerIndex(Expression):
     def __init__(self, var: Identifier, index_exp: Expression):
         self.var = var.name
         self.index_exp = index_exp
+
+@dataclasses.dataclass
+class ArrayDef(Expression):
+    values: list[Expression]
+
+    def __init__(self, *args):
+        self.values = list(args)
 
 @dataclasses.dataclass
 class Assignment(Statement):
