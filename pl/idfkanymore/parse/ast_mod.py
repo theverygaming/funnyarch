@@ -169,7 +169,7 @@ class ArrayDef(Expression):
 
 @dataclasses.dataclass
 class Assignment(Statement):
-    to: Identifier | PointerIndex
+    to: Variable | PointerIndex
     value: Expression
 
 

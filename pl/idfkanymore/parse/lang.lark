@@ -83,7 +83,7 @@ constant: SIGNED_INT | ESCAPED_STRING
 
 procedure_call: IDENTIFIER _LPAREN (expression (_COMMA expression)*)* _RPAREN
 
-assignment: (IDENTIFIER | pointer_index) _EQUALS expression _SEMICOLON
+assignment: (variable | pointer_index) _EQUALS expression _SEMICOLON
 
 return: _RETURN expression _SEMICOLON
 

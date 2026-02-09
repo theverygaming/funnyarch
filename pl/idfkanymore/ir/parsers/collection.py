@@ -7,7 +7,7 @@ from . import expr
 @irgen.reg_ast_node_parser((ast_mod.Assignment,), end_only=True)
 def parse_assignment(ctx, node, bubble):
     ret = []
-    if isinstance(node.to, ast_mod.Identifier):
+    if isinstance(node.to, ast_mod.Variable):
         var_name = node.to.name
         dst = ctx.proc_locals.get(var_name, None)
         is_local = True
