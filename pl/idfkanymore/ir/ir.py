@@ -1,5 +1,6 @@
 import enum
 import dataclasses
+from idfkanymore.parse import ast_mod
 
 class BaseIrObj:
     pass
@@ -100,13 +101,24 @@ class Compare(IrInstrObj):
 
 @dataclasses.dataclass
 class LocalLabel(IrInstrObj):
-    label: str
+    label: int
 
 
 @dataclasses.dataclass
 class JumpLocalLabel(IrInstrObj):
-    label: str
-    cond_regid: int | None = None
+    label: int
+
+
+@dataclasses.dataclass
+class JumpLocalLabelCondTruthy(IrInstrObj):
+    label: int
+    cond_regid: int
+
+
+@dataclasses.dataclass
+class JumpLocalLabelCondFalsy(IrInstrObj):
+    label: int
+    cond_regid: int
 
 
 @dataclasses.dataclass
@@ -144,8 +156,8 @@ class GetGlobalPtr(IrInstrObj):
 
 
 @dataclasses.dataclass
-class GetArgPtr(IrInstrObj):
-    regid_ptr_dst: int
+class GetArgVal(IrInstrObj):
+    regid_dst: int
     arg_name: str
 
 
@@ -170,20 +182,20 @@ class BinaryOperator(BaseIrObj, enum.Enum):
     @classmethod
     def from_ast_op(cls, ast_op):
         transl = {
-            "Add": cls.ADD,
-            "Sub": cls.SUB,
-            "Mult": cls.MULT,
-            "Div": cls.DIV,
-            "Mod": cls.MOD,
-            "LShift": cls.LSHIFT,
-            "RShift": cls.RSHIFT,
-            "BitOr": cls.OR,
-            "BitXor": cls.XOR,
-            "BitAnd": cls.AND,
+            ast_mod.BinaryOperatorType.PLUS: cls.ADD,
+            ast_mod.BinaryOperatorType.MINUS: cls.SUB,
+            ast_mod.BinaryOperatorType.MULTIPLY: cls.MULT,
+            ast_mod.BinaryOperatorType.DIVIDE: cls.DIV,
+            ast_mod.BinaryOperatorType.REMAINDER: cls.MOD,
+            ast_mod.BinaryOperatorType.BW_SHIFT_LEFT: cls.LSHIFT,
+            ast_mod.BinaryOperatorType.BW_SHIFT_RIGHT: cls.RSHIFT,
+            ast_mod.BinaryOperatorType.BW_OR: cls.OR,
+            ast_mod.BinaryOperatorType.BW_XOR: cls.XOR,
+            ast_mod.BinaryOperatorType.BW_AND: cls.AND,
         }
-        if ast_op.__class__.__name__ not in transl:
+        if ast_op not in transl:
             raise Exception(f"cannot translate operator {ast_op}")
-        return transl[ast_op.__class__.__name__]
+        return transl[ast_op]
 
 
 @dataclasses.dataclass

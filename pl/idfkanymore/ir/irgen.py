@@ -26,6 +26,8 @@ class IrGenContext:
 
         "USIZE": ir.DatatypeSimpleInteger(32, False),
 
+        "REGISTER": ir.DatatypeSimpleInteger(32, False),
+
         "VOID": None,
     }
     globalvars = {}
@@ -41,6 +43,7 @@ class IrGenContext:
     proc_label_counter = None
     proc_closest_loop_escape_label = None
     proc_closest_loop_continue_label = None
+    proc_return_type = None
 
     def alloc_vreg(self, t):
         self.proc_vreg_counter += 1

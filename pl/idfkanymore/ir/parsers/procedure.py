@@ -19,6 +19,7 @@ def parse_procedure_def(ctx, node, bubble):
     ctx.proc_label_counter = -1
     ctx.proc_closest_loop_escape_label = None
     ctx.proc_closest_loop_continue_label = None
+    ctx.proc_return_type = ctx.lookup_type(node.prototype.return_type)
 
     for name, t in args:
         ctx.proc_locals[name] = {
@@ -32,8 +33,6 @@ def parse_procedure_def(ctx, node, bubble):
             "regid": ctx.alloc_vreg(t),
         }
 
-    return_type = ctx.lookup_type(node.prototype.return_type)
-
     body = []
     for n in node.block.statements:
         body += bubble(n)
@@ -43,7 +42,7 @@ def parse_procedure_def(ctx, node, bubble):
             node.prototype.name,
             ctx.proc_is_leaf,
             args,
-            return_type,
+            ctx.proc_return_type,
             ctx.proc_regs,
             body,
             True,

@@ -9,19 +9,18 @@ def parse_assignment(ctx, node, bubble):
     ret = []
     if isinstance(node.to, ast_mod.Variable):
         var_name = node.to.name
-        dst = ctx.proc_locals.get(var_name, None)
-        is_local = True
-        if dst is None:
-            is_local = False
-            dst = ctx.globalvars.get(var_name, None)
-        irlib.assertion(dst is not None, f"variable with name {var_name} not found")
-        if is_local:
-            irlib.assertion(dst["kind"] == "var", "can only assign to variables")
+        var_found = expr.find_variable(ctx, var_name)
+        dst = var_found["val"]
+        irlib.assertion(var_found["type"] in ["var", "global"], "can only assign to variables")
+        is_local = var_found["type"] == "var"
+
         if is_local:
             dst_vreg = dst["regid"]
         else:
             dst_vreg = ctx.alloc_vreg(dst["type"])
+
         ret += expr.eval_expr(ctx, node.value, dst_vreg)
+
         if not is_local:
             tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
             tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
@@ -35,3 +34,36 @@ def parse_assignment(ctx, node, bubble):
     else:
         raise Exception("qwhar??")
     return ret
+
+@irgen.reg_ast_node_parser((ast_mod.Return,), end_only=True)
+def parse_return(ctx, node, bubble):
+    ret = []
+    dst_vreg = ctx.alloc_vreg(ctx.proc_return_type)
+    ret += expr.eval_expr(ctx, node.expr, dst_vreg)
+    ret.append(ir.FuncReturn(dst_vreg))
+    return ret
+
+@irgen.reg_ast_node_parser((ast_mod.While,), end_only=True)
+def parse_while(ctx, node, bubble):
+    lbl_start = ctx.alloc_label()
+    lbl_end = ctx.alloc_label()
+
+    prev_lbl_esc = ctx.proc_closest_loop_escape_label
+    prev_lbl_cont = ctx.proc_closest_loop_continue_label
+    ctx.proc_closest_loop_escape_label = lbl_end
+    ctx.proc_closest_loop_continue_label = lbl_start
+    body = []
+    for n in node.block.statements:
+        body += bubble(n)
+    ctx.proc_closest_loop_escape_label = prev_lbl_esc
+    ctx.proc_closest_loop_continue_label = prev_lbl_cont
+
+    cond_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
+
+    return ([
+        ir.LocalLabel(lbl_start),
+    ] + expr.eval_expr(ctx, node.cond, cond_vreg) + [
+        ir.JumpLocalLabelCondFalsy(lbl_end, cond_vreg),
+    ] + body + [
+        ir.LocalLabel(lbl_end),
+    ])
