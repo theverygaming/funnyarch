@@ -91,6 +91,7 @@ def parse_while(ctx, node, bubble):
     ] + expr.eval_expr(ctx, node.cond, cond_vreg) + [
         ir.JumpLocalLabelCondFalsy(lbl_end, cond_vreg),
     ] + body + [
+        ir.JumpLocalLabel(lbl_start),
         ir.LocalLabel(lbl_end),
     ])
 
