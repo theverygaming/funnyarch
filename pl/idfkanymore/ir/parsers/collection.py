@@ -67,3 +67,50 @@ def parse_while(ctx, node, bubble):
     ] + body + [
         ir.LocalLabel(lbl_end),
     ])
+
+@irgen.reg_ast_node_parser((ast_mod.If,), end_only=True)
+def parse_if(ctx, node, bubble):
+    def _gen_simple_if(cond, body, lbl_else):
+        ret = []
+
+        if cond is not None:
+            cond_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
+            ret += expr.eval_expr(ctx, cond, cond_vreg)
+            ret.append(ir.JumpLocalLabelCondFalsy(lbl_else, cond_vreg))
+
+        for n in body:
+            ret += bubble(n)
+
+        return ret
+
+    ret = []
+
+    # prepare
+    if_chain = []
+    if_chain.append([node.cond, node.then])
+    if_chain += map(list, node.elsif)
+    if node.else_ is not None:
+        if_chain.append([None, node.else_])
+
+    # generate a label for each branch that isn't the first, and add labels for the next
+    for i in reversed(range(len(if_chain))):
+        lbl_self = None
+        if i != 0:
+            lbl_self = ctx.alloc_label()
+        if_chain[i].append(lbl_self)
+
+    # add else labels
+    for i in range(len(if_chain)):
+        lbl_else = None
+        # everything other than last one has a else label
+        if i != len(if_chain) - 1:
+            lbl_else = if_chain[i+1][2]
+        if_chain[i].append(lbl_else)
+
+    # generate code
+    for cond, body, lbl_self, lbl_else in if_chain:
+        if lbl_self is not None:
+            ret.append(ir.LocalLabel(lbl_self))
+        ret += _gen_simple_if(cond, body.statements, lbl_else)
+
+    return ret

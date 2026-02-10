@@ -97,9 +97,6 @@ class IrGenContext:
                 if isinstance(data, ir.BaseIrObj):
                     return [data]
 
-        # FIXME: bad assert
-        print_d(f"irgen MISSING {node}")
-        return []
         irlib.assertion(False, f"cannot generate IR for AST node {node} parent_nodes: {parent_nodes}")
 
     def gen_global_vars(self):
