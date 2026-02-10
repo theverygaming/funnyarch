@@ -15,11 +15,11 @@ def parse_assignment(ctx, node, bubble):
         is_local = var_found["type"] == "var"
 
         if is_local:
-            dst_vreg = dst["regid"]
+            val_vreg = dst["regid"]
         else:
-            dst_vreg = ctx.alloc_vreg(dst["type"])
+            val_vreg = ctx.alloc_vreg(dst["type"])
 
-        ret += expr.eval_expr(ctx, node.value, dst_vreg)
+        ret += expr.eval_expr(ctx, node.value, val_vreg)
 
         if not is_local:
             tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
@@ -27,10 +27,36 @@ def parse_assignment(ctx, node, bubble):
             ret += [
                 ir.GetGlobalPtr(tmp_vreg_ptr, var_name),
                 ir.SetRegImm(tmp_vreg_idx, 0),
-                ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, dst_vreg, dst["type"]),
+                ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, val_vreg, dst["type"]),
             ]
     elif isinstance(node.to, ast_mod.PointerIndex):
-        raise NotImplementedError("pointer assignment not yet supported")
+        var_name = node.to.var
+        var_found = expr.find_variable(ctx, var_name)
+        dst = var_found["val"]
+
+        val_vreg = ctx.alloc_vreg(dst["type"].to)
+        ret += expr.eval_expr(ctx, node.value, val_vreg)
+        idx_vreg = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+        ret += expr.eval_expr(ctx, node.to.index_exp, idx_vreg)
+
+        match var_found["type"]:
+            case "var":
+                ptr_vreg = dst["regid"]
+            case "arg":
+                ptr_vreg = ctx.alloc_vreg(dst["type"])
+                ret.append(ir.GetArgVal(ptr_vreg, var_name))
+            case "global":
+                ptr_vreg = ctx.alloc_vreg(dst["type"])
+                gbl_ptr_vreg = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
+                tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+                ret += [
+                    ir.GetGlobalPtr(gbl_ptr_vreg, var_name),
+                    ir.SetRegImm(tmp_vreg_idx, 0),
+                    ir.GetPtrReg(ptr_vreg, gbl_ptr_vreg, tmp_vreg_idx, ctx.proc_regs[gbl_ptr_vreg].to),
+                ]
+            case _:
+                raise Exception(f"pointer index assignment: unsupported var type {var_found['type']}")
+        ret.append(ir.SetPtrReg(ptr_vreg, idx_vreg, val_vreg, ctx.proc_regs[ptr_vreg].to))
     else:
         raise Exception("qwhar??")
     return ret

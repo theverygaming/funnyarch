@@ -33,5 +33,20 @@ BEGIN
     global_x = global_x + strlen("hello world");
     global_x = global_x + 10;
     strlen("123");
-    //global_x[0] = 5; // FIXME: support
+    global_ptr[0] = 5;
+END
+
+EXPORT PROCEDURE nullptr_access(x: POINTER TO U8): VOID; // another silly test function
+VARS
+    funny: POINTER TO U8;
+BEGIN
+    x[10] = 15;
+
+    funny = 0;
+    funny[0] = 1;
+    funny[0] = 2;
+
+    funny = 1000;
+    funny[0] = 1;
+    funny[0] = 2;
 END
