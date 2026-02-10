@@ -1,4 +1,4 @@
-start: (import_stmt | globalvar | procedure_def)*
+start: (import_stmt | globalvar | procedure_def | globalvar_decl | procedure_decl)*
 start_header: (import_stmt | globalvar_decl | procedure_decl)*
 
 // core language
