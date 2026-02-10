@@ -54,6 +54,13 @@ class BackendFunnyarch(backends.Backend):
                 write_l("ldri lr, rsp, #4")
             write_l("mov rip, lr")
 
+        def set_reg(reg, n_bytes, n):
+            if n.bit_length() > n_bytes * 8:
+                raise Exception("set_reg: number too large")
+            write_l(f"mov {reg}, #{n & 0xFFFF}")
+            if n.bit_length() / 8 > 2:
+                write_l(f"movh {reg}, #{n >> 16}")
+
         # calling convention:
         # caller saves r0-r7 (arguments)
         # callee saves: r8-r26, rfp, lr
@@ -80,6 +87,7 @@ class BackendFunnyarch(backends.Backend):
             freeregs_idx += 1
 
         # function entry
+        asm += f"{fn_inst.name}:\n"
         if not fn_inst.leaf:
             write_l("strpi rsp, lr, #-4")
         write_l("strpi rsp, rfp, #-4")
@@ -88,7 +96,7 @@ class BackendFunnyarch(backends.Backend):
         for inst in fn_inst.body:
             write_l(f"// IR: {inst}")
             if isinstance(inst, ir.SetRegImm):
-                write_l(f"mov {reg_map[inst.regid]}, #{inst.value}")
+                set_reg(reg_map[inst.regid], 4, inst.value)
             elif isinstance(inst, ir.LocalLabel):
                 write_l(f".{fn_inst.name}_{inst.label}:")
             elif isinstance(inst, ir.GetArgVal):
@@ -102,26 +110,29 @@ class BackendFunnyarch(backends.Backend):
                 write_l(f"mov {tmpreg}, {reg_map[inst.regid_index]}")
 
                 # power of two multiplication
-                s = self._get_type_bytes(inst.type_)
-                if s & (s - 1) != 0:
+                t_bytes = self._get_type_bytes(inst.type_)
+                if t_bytes & (t_bytes - 1) != 0:
                     raise Exception("GetPtrReg: type size not a power of two")
-                toshift = s.bit_length() - 1
+                toshift = t_bytes.bit_length() - 1
                 if toshift != 0:
                     write_l(f"shl {tmpreg}, {tmpreg}, #{toshift}")
 
                 write_l(f"add {tmpreg}, {reg_map[inst.regid_ptr]}, {tmpreg}")
                 write_l(f"ldr {reg_map[inst.regid_value]}, {tmpreg}, #0")
+                if t_bytes != 4:
+                    set_reg(tmpreg, 4, (1 << (t_bytes*8))-1)
+                    write_l(f"and {reg_map[inst.regid_value]}, {reg_map[inst.regid_value]}, {tmpreg}")
             elif isinstance(inst, ir.SetPtrReg):
                 write_l(f"mov {tmpreg}, {reg_map[inst.regid_index]}")
 
                 # power of two multiplication
-                s = self._get_type_bytes(inst.type_)
-                if s & (s - 1) != 0:
-                    raise Exception("SetPtrReg: type size not a power of two")
-                toshift = s.bit_length() - 1
+                t_bytes = self._get_type_bytes(inst.type_)
+                if t_bytes & (t_bytes - 1) != 0:
+                    raise Exception("GetPtrReg: type size not a power of two")
+                toshift = t_bytes.bit_length() - 1
                 if toshift != 0:
                     write_l(f"shl {tmpreg}, {tmpreg}, #{toshift}")
-
+                # FIXME: this overwrites data if the type is not 32-bit integer # BUG
                 write_l(f"add {tmpreg}, {reg_map[inst.regid_ptr]}, {tmpreg}")
                 write_l(f"str {tmpreg}, {reg_map[inst.regid_value]}, #0")
             elif isinstance(inst, ir.JumpLocalLabel):

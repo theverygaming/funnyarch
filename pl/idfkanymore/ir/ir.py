@@ -125,6 +125,7 @@ class JumpLocalLabelCondFalsy(IrInstrObj):
 class SetRegImm(IrInstrObj):
     regid: int
     value: object
+    # TODO: this should probably have a type
 
 
 @dataclasses.dataclass
