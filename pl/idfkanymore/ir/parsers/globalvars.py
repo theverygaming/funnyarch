@@ -5,7 +5,6 @@ from .. import irgen as irgen
 
 @irgen.reg_ast_node_parser((ast_mod.GlobalvarDecl,))
 def parse_globalvar_decl(ctx, node, bubble):
-    irlib.assertion(isinstance(node.type_, ast_mod.TypeName), f"global {node.name} unsupported type")
     t = ctx.lookup_type(node.type_)
     if node.name in ctx.globalvars:
         irlib.assertion(ctx.globalvars[node.name]["type"] == t, f"global {node.name} declared or defined with a different type")
@@ -56,7 +55,6 @@ def _compute_constant_expr(node):
 
 @irgen.reg_ast_node_parser((ast_mod.Globalvar,))
 def parse_globalvar_def(ctx, node, bubble):
-    irlib.assertion(isinstance(node.type_, ast_mod.TypeName), f"global {node.name} unsupported type")
     t = t = ctx.lookup_type(node.type_)
     if node.name in ctx.globalvars:
         irlib.assertion(ctx.globalvars[node.name]["type"] == t, f"global {node.name} declared or defined with a different type")
