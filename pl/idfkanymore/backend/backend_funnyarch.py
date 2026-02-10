@@ -124,6 +124,11 @@ class BackendFunnyarch(backends.Backend):
 
                 write_l(f"add {tmpreg}, {reg_map[inst.regid_ptr]}, {tmpreg}")
                 write_l(f"str {tmpreg}, {reg_map[inst.regid_value]}, #0")
+            elif isinstance(inst, ir.JumpLocalLabel):
+                write_l(f"rjmp .{fn_inst.name}_{inst.label}")
+            elif isinstance(inst, ir.JumpLocalLabelCondTruthy):
+                write_l(f"cmp {reg_map[inst.cond_regid]}, #0")
+                write_l(f"ifneq rjmp .{fn_inst.name}_{inst.label}")
             elif isinstance(inst, ir.JumpLocalLabelCondFalsy):
                 write_l(f"cmp {reg_map[inst.cond_regid]}, #0")
                 write_l(f"ifeq rjmp .{fn_inst.name}_{inst.label}")
