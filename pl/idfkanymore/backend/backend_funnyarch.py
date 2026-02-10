@@ -21,6 +21,9 @@ class BackendFunnyarch(backends.Backend):
                     i_bytes = inst.type_.bits // 8
                     for b in inst.value.to_bytes(i_bytes, "little", signed=inst.type_.signed):
                         write_l(F".byte 0x{b:x}")
+                elif isinstance(inst.type_, ir.DatatypePointer):
+                    for b in inst.value.to_bytes(4, "little", signed=False):
+                        write_l(F".byte 0x{b:x}")
                 else:
                     raise Exception(f"encountered unknown datatype {inst.type_}")
             elif isinstance(inst, ir.Function):
