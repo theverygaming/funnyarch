@@ -63,5 +63,5 @@ with open(args.infilename, "r", encoding="utf-8") as f:
     asm = target_be.gen_assembly(ir)
     print("\n")
     print(asm)
-    #with open(args.out, "w", encoding="utf-8") as f:
-    #    f.write(asm)
+    with open(args.out, "w", encoding="utf-8") as f:
+        f.write(asm)
