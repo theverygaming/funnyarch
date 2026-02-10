@@ -4,6 +4,6 @@ in
 stdenv.mkDerivation {
   name = "funnyarch-assembler";
   buildInputs = [
-    python311
+    python313
   ];
 }
