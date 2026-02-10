@@ -47,5 +47,23 @@ def eval_expr(ctx, expr, dest_vreg_id):
     elif isinstance(expr, ast_mod.ProcedureCall):
         # TODO: set leaf!
         pass
+    elif isinstance(expr, ast_mod.PointerIndex):
+        ret = []
+
+        var_found = find_variable(ctx, expr.var)
+        match var_found["type"]:
+            case "var":
+                tmp_vreg_ptr = var_found["val"]["regid"]
+            case "arg":
+                tmp_vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
+                ret.append(ir.GetArgVal(tmp_vreg_ptr, expr.var))
+            case "global":
+                tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
+                ret.append(ir.GetGlobalPtr(tmp_vreg_ptr, expr.var))
+
+        tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+        ret += eval_expr(ctx, expr.index_exp, tmp_vreg_idx)
+        ret.append(ir.GetPtrReg(dest_vreg_id, tmp_vreg_ptr, tmp_vreg_idx, ctx.proc_regs[tmp_vreg_ptr].to))
+        return ret
 
     raise NotImplementedError(f"unknown expr {expr}")
