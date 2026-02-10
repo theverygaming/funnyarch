@@ -69,5 +69,13 @@ def eval_expr(ctx, expr, dest_vreg_id):
         ret += eval_expr(ctx, expr.index_exp, tmp_vreg_idx)
         ret.append(ir.GetPtrReg(dest_vreg_id, tmp_vreg_ptr, tmp_vreg_idx, ctx.proc_regs[tmp_vreg_ptr].to))
         return ret
+    elif isinstance(expr, ast_mod.Comparison):
+        tmp_vreg_lhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
+        tmp_vreg_rhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
+        return (
+            eval_expr(ctx, expr.lhs, tmp_vreg_lhs)
+            + eval_expr(ctx, expr.rhs, tmp_vreg_rhs)
+            + [ir.Compare(dest_vreg_id, tmp_vreg_lhs, ir.CompareOperator.from_ast_op(expr.operator), tmp_vreg_rhs)]
+        )
 
     raise NotImplementedError(f"unknown expr {expr}")

@@ -79,16 +79,16 @@ class CompareOperator(BaseIrObj, enum.Enum):
     @classmethod
     def from_ast_op(cls, ast_op):
         transl = {
-            "Eq": cls.EQ,
-            "NotEq": cls.NEQ,
-            "Lt": cls.LT,
-            "LtE": cls.LTEQ,
-            "Gt": cls.GT,
-            "GtE": cls.GTEQ,
+            ast_mod.ComparisonOperatorType.EQ: cls.EQ,
+            ast_mod.ComparisonOperatorType.NEQ: cls.NEQ,
+            ast_mod.ComparisonOperatorType.LT: cls.LT,
+            ast_mod.ComparisonOperatorType.LTEQ: cls.LTEQ,
+            ast_mod.ComparisonOperatorType.GT: cls.GT,
+            ast_mod.ComparisonOperatorType.GTEQ: cls.GTEQ,
         }
-        if ast_op.__class__.__name__ not in transl:
+        if ast_op not in transl:
             raise Exception(f"cannot translate comparison operator {ast_op}")
-        return transl[ast_op.__class__.__name__]
+        return transl[ast_op]
 
 
 @dataclasses.dataclass
