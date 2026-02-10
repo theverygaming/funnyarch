@@ -79,7 +79,7 @@ pointer_index: variable _LBRACKET expression _RBRACKET
 
 variable: IDENTIFIER
 
-constant: SIGNED_INT | ESCAPED_STRING
+constant: HEX_NUMBER | SIGNED_INT | ESCAPED_STRING
 
 procedure_call: IDENTIFIER _LPAREN (expression (_COMMA expression)*)* _RPAREN
 
@@ -149,6 +149,7 @@ LOGICAL_AND: "&&"
 LOGICAL_OR: "||"
 
 // other stuff, no idea what u call this
+HEX_NUMBER.1: /0x[0-9a-fA-F]+/
 IDENTIFIER: /[a-zA-Z_][a-zA-Z0-9_]*/
 COMMENT: "//" /[^\n]/*
 

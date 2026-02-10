@@ -259,7 +259,10 @@ class ToAst(lark.Transformer):
 
     def SIGNED_INT(self, n):
         return int(n)
-    
+
+    def HEX_NUMBER(self, n):
+        return int(n, 16)
+
     def IDENTIFIER(self, t):
         return Identifier(str(t))
 
