@@ -24,8 +24,14 @@ def eval_expr(ctx, expr, dest_vreg_id):
         if isinstance(expr.value, int):
             return [ir.SetRegImm(dest_vreg_id, expr.value)]
         elif isinstance(expr.value, str):
-            # FIXME: strings
-            return [ir.SetRegImm(dest_vreg_id, ord(expr.value[0]))]
+            varname = f"__global_str_{abs(hash(expr.value))}"
+            if varname not in ctx.globalvars:
+                ctx.globalvars[varname] = {
+                    "type": ir.DatatypeArray(ctx.datatypes["U8"], len(expr.value) + 1),
+                    "value": [ord(c) for c in expr.value] + [0],
+                    "def": True,
+                }
+            return [ir.GetGlobalPtr(dest_vreg_id, varname)]
     elif isinstance(expr, ast_mod.Variable):
         var_found = find_variable(ctx, expr.name)
         match var_found["type"]:

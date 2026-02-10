@@ -28,10 +28,15 @@ class BackendFunnyarch(backends.Backend):
                 if isinstance(inst.type_, ir.DatatypeSimpleInteger):
                     i_bytes = self._get_type_bytes(inst.type_)
                     for b in inst.value.to_bytes(i_bytes, "little", signed=inst.type_.signed):
-                        write_l(F".byte 0x{b:x}")
+                        write_l(f".byte 0x{b:x}")
                 elif isinstance(inst.type_, ir.DatatypePointer):
                     for b in inst.value.to_bytes(4, "little", signed=False):
-                        write_l(F".byte 0x{b:x}")
+                        write_l(f".byte 0x{b:x}")
+                elif isinstance(inst.type_, ir.DatatypeArray) and isinstance(inst.type_.item_type, ir.DatatypeSimpleInteger):
+                    i_bytes = self._get_type_bytes(inst.type_.item_type)
+                    for i in range(inst.type_.length):
+                        for b in inst.value[i].to_bytes(i_bytes, "little", signed=inst.type_.item_type.signed):
+                            write_l(f".byte 0x{b:x}")
                 else:
                     raise Exception(f"encountered unknown datatype {inst.type_}")
             elif isinstance(inst, ir.Function):
@@ -49,10 +54,7 @@ class BackendFunnyarch(backends.Backend):
             asm += "  " + s + "\n"
         
         def fn_ret():
-            write_l("ldri rfp, rsp, #4")
-            if not fn_inst.leaf:
-                write_l("ldri lr, rsp, #4")
-            write_l("mov rip, lr")
+            write_l(f"rjmp .{fn_inst.name}_exit")
 
         def set_reg(reg, n_bytes, n):
             if n.bit_length() > n_bytes * 8:
@@ -85,6 +87,7 @@ class BackendFunnyarch(backends.Backend):
                 raise Exception(f"ran out of registers to use in fn {fn_inst.name}")
             reg_map[id_] = _free_regs[freeregs_idx]
             freeregs_idx += 1
+        regs_callee_saved = list(reg_map.values()) + ["r26"]
 
         # function entry
         asm += f"{fn_inst.name}:\n"
@@ -92,6 +95,8 @@ class BackendFunnyarch(backends.Backend):
             write_l("strpi rsp, lr, #-4")
         write_l("strpi rsp, rfp, #-4")
         write_l("mov rfp, rsp")
+        for reg in regs_callee_saved:
+            write_l(f"strpi rsp, {reg}, #-4")
 
         for inst in fn_inst.body:
             write_l(f"// IR: {inst}")
@@ -160,10 +165,31 @@ class BackendFunnyarch(backends.Backend):
             elif isinstance(inst, ir.FuncReturn):
                 write_l(f"mov r0, {reg_map[inst.regid_retval]}")
                 fn_ret()
+            elif isinstance(inst, (ir.GetGlobalPtr, ir.GetFnPtr)):
+                write_l(f"mov {reg_map[inst.regid_ptr_dst]}, {inst.name}")
+            elif isinstance(inst, ir.FuncCall):
+                if inst.name is None:
+                    raise Exception("function pointer calls not supported yet")
+                _arg_regs = ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"]
+                regs_caller_save = _arg_regs[:max(len(fn_inst.args), len(inst.regids_args))]
+                for reg in regs_caller_save:
+                    write_l(f"strpi rsp, {reg}, #-4")
+                for i, reg in enumerate(inst.regids_args):
+                    write_l(f"mov {_arg_regs[i]}, {reg_map[reg]}")
+                write_l(f"rjal {inst.name}")
+                if inst.regid_return is not None:
+                    write_l(f"mov {reg_map[inst.regid_return]}, r0")
+                for reg in reversed(regs_caller_save):
+                    write_l(f"ldri {reg}, rsp, #4")
             else:
                 raise Exception(f"unknown IR instr {inst}")
 
-        # TODO: this can be dead code, we should check if it is!
-        fn_ret()
+        write_l(f".{fn_inst.name}_exit:")
+        for reg in reversed(regs_callee_saved):
+            write_l(f"ldri {reg}, rsp, #4")
+        write_l("ldri rfp, rsp, #4")
+        if not fn_inst.leaf:
+            write_l("ldri lr, rsp, #4")
+        write_l("mov rip, lr")
 
         return asm

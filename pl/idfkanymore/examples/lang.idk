@@ -1,11 +1,29 @@
 IMPORT "header.idkh";
 
-EXPORT VAR global_x: U8 = (((1 * 20) + 4) | 1) << 1;
-EXPORT VAR global_ptr: POINTER TO U8 = 0; // this shall crash so hard :3
+EXPORT VAR serial_data: POINTER TO U32 = 0xF004B000;
 
-//EXPORT VAR global_arr: ARRAY[3] OF POINTER TO U8 = ["s1", "s2", "s3"]; // FIXME: support
+EXPORT PROCEDURE main(): VOID;
+BEGIN
+    print("hello world!");
+    WHILE 1 DO
+    DONE
+END
 
-EXPORT VAR global_y: U8 = 1;
+EXPORT PROCEDURE print(str: POINTER TO U8): VOID;
+VARS
+    len: USIZE;
+BEGIN
+    len = 0;
+    WHILE str[len] DO
+        print_char(str[len]);
+        len = len + 1;
+    DONE
+END
+
+EXPORT PROCEDURE print_char(c: U8): VOID;
+BEGIN
+    serial_data[0] = c;
+END
 
 EXPORT PROCEDURE strlen(str: POINTER TO U8): USIZE;
 VARS
@@ -19,6 +37,13 @@ BEGIN
 END
 
 // silly test functions
+
+EXPORT VAR global_x: U8 = (((1 * 20) + 4) | 1) << 1;
+EXPORT VAR global_ptr: POINTER TO U8 = 0; // this shall crash so hard :3
+
+//EXPORT VAR global_arr: ARRAY[3] OF POINTER TO U8 = ["s1", "s2", "s3"]; // FIXME: support
+
+EXPORT VAR global_y: U8 = 1;
 
 EXPORT PROCEDURE set_global(val: U8, val2: U16): VOID;
 BEGIN

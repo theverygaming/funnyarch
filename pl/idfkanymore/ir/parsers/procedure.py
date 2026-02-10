@@ -5,7 +5,7 @@ from .. import irgen as irgen
 from . import expr
 
 def gen_call(ctx, fn_name, arg_expr_list, retval_vreg=None):
-    ctx.func_leaf = False
+    ctx.proc_is_leaf = False
     # FIXME: verify fn name??
     ret = []
     arg_vregs = []
@@ -16,8 +16,7 @@ def gen_call(ctx, fn_name, arg_expr_list, retval_vreg=None):
         ret += expr.eval_expr(ctx, arg_expr, tmp_arg_vreg)
     tmp_fnptr_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
     ret += [
-        ir.GetFnPtr(tmp_fnptr_vreg, fn_name),
-        ir.FuncCall(tmp_fnptr_vreg, arg_vregs, retval_vreg),
+        ir.FuncCall(None, fn_name, arg_vregs, retval_vreg),
     ]
     return ret
 

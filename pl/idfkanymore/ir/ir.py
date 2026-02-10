@@ -33,7 +33,7 @@ class DatatypeSimpleInteger(Datatype):
 
 @dataclasses.dataclass
 class DatatypeArray(Datatype):
-    items: Datatype
+    item_type: Datatype
     length: int
 
 
@@ -63,7 +63,8 @@ class FuncReturn(IrInstrObj):
 
 @dataclasses.dataclass
 class FuncCall(IrInstrObj):
-    regid_ptr: int
+    regid_ptr: int | None
+    name: str | None
     regids_args: list[int]
     regid_return: int | None = None
 
