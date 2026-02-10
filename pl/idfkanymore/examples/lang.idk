@@ -29,7 +29,7 @@ BEGIN
     ELSE
         global_x = ~20;
     END
-    //global_x = global_x + strlen("hello world");
+    global_x = global_x + strlen("hello world");
     global_x = global_x + 10;
     strlen("123");
     //global_x[0] = 5; // FIXME: support

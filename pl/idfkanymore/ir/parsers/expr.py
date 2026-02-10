@@ -2,6 +2,7 @@ from idfkanymore.parse import ast_mod
 from .. import ir
 from .. import lib as irlib
 from .. import irgen as irgen
+from . import procedure
 
 def find_variable(ctx, name):
     val = ctx.proc_locals.get(name, None)
@@ -19,8 +20,12 @@ def find_variable(ctx, name):
     irlib.assertion(False, f"variable with name {name} not found")
 
 def eval_expr(ctx, expr, dest_vreg_id):
-    if isinstance(expr, ast_mod.Constant) and isinstance(expr.value, int):
-        return [ir.SetRegImm(dest_vreg_id, expr.value)]
+    if isinstance(expr, ast_mod.Constant):
+        if isinstance(expr.value, int):
+            return [ir.SetRegImm(dest_vreg_id, expr.value)]
+        elif isinstance(expr.value, str):
+            # FIXME: strings
+            return [ir.SetRegImm(dest_vreg_id, ord(expr.value[0]))]
     elif isinstance(expr, ast_mod.Variable):
         var_found = find_variable(ctx, expr.name)
         match var_found["type"]:
@@ -45,8 +50,7 @@ def eval_expr(ctx, expr, dest_vreg_id):
             + [ir.BinOp(dest_vreg_id, tmp_vreg_lhs, ir.BinaryOperator.from_ast_op(expr.operator), tmp_vreg_rhs)]
         )
     elif isinstance(expr, ast_mod.ProcedureCall):
-        # TODO: set leaf!
-        pass
+        return procedure.gen_call(ctx, expr.name, expr.args, dest_vreg_id)
     elif isinstance(expr, ast_mod.PointerIndex):
         ret = []
 

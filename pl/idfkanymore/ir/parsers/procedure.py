@@ -2,6 +2,25 @@ from idfkanymore.parse import ast_mod
 from .. import ir
 from .. import lib as irlib
 from .. import irgen as irgen
+from . import expr
+
+def gen_call(ctx, fn_name, arg_expr_list, retval_vreg=None):
+    ctx.func_leaf = False
+    # FIXME: verify fn name??
+    ret = []
+    arg_vregs = []
+    for arg_expr in arg_expr_list:
+        # FIXME: args types???? Check fn signature??? # BUG:
+        tmp_arg_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
+        arg_vregs.append(tmp_arg_vreg)
+        ret += expr.eval_expr(ctx, arg_expr, tmp_arg_vreg)
+    tmp_fnptr_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
+    ret += [
+        ir.GetFnPtr(tmp_fnptr_vreg, fn_name),
+        ir.FuncCall(tmp_fnptr_vreg, arg_vregs, retval_vreg),
+    ]
+    return ret
+
 
 @irgen.reg_ast_node_parser((ast_mod.ProcedureDecl,))
 def parse_procedure_decl(ctx, node, bubble):
@@ -48,3 +67,7 @@ def parse_procedure_def(ctx, node, bubble):
             True,
         )
     ]
+
+@irgen.reg_ast_node_parser((ast_mod.ProcedureCall,), end_only=True)
+def parse_procedure_call(ctx, node, bubble):
+    return gen_call(ctx, node.name, node.args)
