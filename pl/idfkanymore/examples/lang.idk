@@ -18,7 +18,9 @@ BEGIN
     RETURN len;
 END
 
-EXPORT PROCEDURE set_global(val: U8, val2: U16): VOID; // silly test function
+// silly test functions
+
+EXPORT PROCEDURE set_global(val: U8, val2: U16): VOID;
 BEGIN
     global_x = val;
     IF val == 5 THEN
@@ -36,7 +38,7 @@ BEGIN
     global_ptr[0] = 5;
 END
 
-EXPORT PROCEDURE nullptr_access(x: POINTER TO U8): VOID; // another silly test function
+EXPORT PROCEDURE nullptr_access(x: POINTER TO U8): VOID;
 VARS
     funny: POINTER TO U8;
 BEGIN
