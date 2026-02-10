@@ -5,8 +5,6 @@ EXPORT VAR serial_data: POINTER TO U32 = 0xF004B000;
 EXPORT PROCEDURE main(): VOID;
 BEGIN
     print("hello world!");
-    WHILE 1 DO
-    DONE
 END
 
 EXPORT PROCEDURE print(str: POINTER TO U8): VOID;
