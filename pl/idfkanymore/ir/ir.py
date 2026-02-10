@@ -212,11 +212,11 @@ class UnaryOperator(BaseIrObj, enum.Enum):
     @classmethod
     def from_ast_op(cls, ast_op):
         transl = {
-            "Not": cls.ADD,
+            ast_mod.UnaryOperatorType.BW_NOT: cls.BW_NOT,
         }
-        if ast_op.__class__.__name__ not in transl:
+        if ast_op not in transl:
             raise Exception(f"cannot translate operator {ast_op}")
-        return transl[ast_op.__class__.__name__]
+        return transl[ast_op]
 
 
 @dataclasses.dataclass

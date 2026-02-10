@@ -77,5 +77,11 @@ def eval_expr(ctx, expr, dest_vreg_id):
             + eval_expr(ctx, expr.rhs, tmp_vreg_rhs)
             + [ir.Compare(dest_vreg_id, tmp_vreg_lhs, ir.CompareOperator.from_ast_op(expr.operator), tmp_vreg_rhs)]
         )
+    elif isinstance(expr, ast_mod.Unaryop):
+        tmp_vreg = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
+        return (
+            eval_expr(ctx, expr.expr, tmp_vreg)
+            + [ir.UnaryOp(dest_vreg_id, ir.UnaryOperator.from_ast_op(expr.operator), tmp_vreg)]
+        )
 
     raise NotImplementedError(f"unknown expr {expr}")
