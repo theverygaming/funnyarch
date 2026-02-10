@@ -180,7 +180,7 @@ class ProcedureCall(Statement, Expression):
 
     def __init__(self, name: Identifier, *args):
         self.name = name.name
-        self.args = list[args]
+        self.args = list(args)
 
 @dataclasses.dataclass
 class Return(Statement):
