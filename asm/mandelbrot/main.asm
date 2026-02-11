@@ -92,20 +92,18 @@ main:
         cmp REG_iteration, #MAX_ITER
         ifgteq rjmp .L4_END
 
-          mov r2, REG_x_2                 // x_tmp = (x_2 ...
-          sub r2, r2, REG_y_2             // ... - y_2) ...
-          sar r2, r2, #FIXED_POINT_SHIFT  // ... / SCALE ...
-          add r2, r2, REG_cx              // ... + cx
-
-          mov r0, #2                      // y = ((2 ...
-          mov r1, REG_x                   // ... * x ...
+          mov r0, #2                            // y = ((2 ...
+          mov r1, REG_x                         // ... * x ...
           rcall(mult)
-          mov r1, REG_y                   // ... * y) ...
+          mov r1, REG_y                         // ... * y) ...
           rcall(mult)
-          sar r0, r0, #FIXED_POINT_SHIFT  // ... / SCALE)
-          add REG_y, r0, REG_cy           // ... + cy
+          sar r0, r0, #FIXED_POINT_SHIFT        // ... / SCALE)
+          add REG_y, r0, REG_cy                 // ... + cy
 
-          mov REG_x, r2                   // x = x_tmp
+          mov REG_x, REG_x_2                    // x = (x_2 ...
+          sub REG_x, REG_x, REG_y_2             // ... - y_2) ...
+          sar REG_x, REG_x, #FIXED_POINT_SHIFT  // ... / SCALE ...
+          add REG_x, REG_x, REG_cx              // ... + cx
 
           // x_2 = x * x
           mov r0, REG_x
@@ -260,9 +258,8 @@ void calc_mandelbrot(uint8_t *image) {
 
         // check if calculation escapes boundary
         for (iteration = 0; iteration < MAX_ITER; iteration++) {
-          uint32_t x_tmp = (int32_t)(x_2 - y_2) / SCALE + cx;
           y = (int32_t)(2 * x * y) / SCALE + cy;
-          x = x_tmp;
+          x = (int32_t)(x_2 - y_2) / SCALE + cx;;
 
           x_2 = x * x;
           y_2 = y * y;
