@@ -83,8 +83,8 @@ class BackendFunnyarch(backends.Backend):
         freeregs_idx = 0
         for id_ in fn_inst.regs:
             if freeregs_idx >= len(_free_regs):
-                return f"// SKILL ISSUE: ran out of registers for function {fn_inst.name}"
-                raise Exception(f"ran out of registers to use in fn {fn_inst.name}")
+                return f"// SKILL ISSUE: ran out of registers for function {fn_inst.name} (need {len(fn_inst.regs)}, got {len(_free_regs)} registers)"
+                raise Exception(f"ran out of registers to use in fn {fn_inst.name} (need {len(fn_inst.regs)}, got {len(_free_regs)} registers)")
             reg_map[id_] = _free_regs[freeregs_idx]
             freeregs_idx += 1
         regs_callee_saved = list(reg_map.values()) + ["r26"]
