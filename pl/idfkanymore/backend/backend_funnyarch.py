@@ -166,7 +166,7 @@ class BackendFunnyarch(backends.Backend):
                     ir.BinaryOperator.XOR: "xor",
                     ir.BinaryOperator.AND: "and",
                 }
-                write_l(f"{binop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_rhs]}, {reg_map[inst.regid_lhs]}")
+                write_l(f"{binop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_lhs]}, {reg_map[inst.regid_rhs]}")
             elif isinstance(inst, ir.UnaryOp):
                 unaryop_inst_map = {
                     ir.UnaryOperator.BW_NOT: "not",
