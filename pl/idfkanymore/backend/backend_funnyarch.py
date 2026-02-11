@@ -172,6 +172,18 @@ class BackendFunnyarch(backends.Backend):
                     ir.UnaryOperator.BW_NOT: "not",
                 }
                 write_l(f"{unaryop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_rhs]}")
+            elif isinstance(inst, ir.Compare):
+                cmpop_map = {
+                    ir.CompareOperator.EQ: "ifeq",
+                    ir.CompareOperator.NEQ: "ifneq",
+                    ir.CompareOperator.LT: "iflt",
+                    ir.CompareOperator.LTEQ: "iflteq",
+                    ir.CompareOperator.GT: "ifgt",
+                    ir.CompareOperator.GTEQ: "ifgteq",
+                }
+                write_l(f"cmp {reg_map[inst.regid_rhs]}, {reg_map[inst.regid_lhs]}")
+                write_l(f"mov {reg_map[inst.regid_result]}, #0")
+                write_l(f"{cmpop_map[inst.op]} mov {reg_map[inst.regid_result]}, #1")
             elif isinstance(inst, ir.FuncReturn):
                 write_l(f"mov r0, {reg_map[inst.regid_retval]}")
                 fn_ret()

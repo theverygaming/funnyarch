@@ -94,7 +94,7 @@ class CompareOperator(BaseIrObj, enum.Enum):
 
 @dataclasses.dataclass
 class Compare(IrInstrObj):
-    regid_res: int
+    regid_result: int
     regid_lhs: int
     op: CompareOperator
     regid_rhs: int
