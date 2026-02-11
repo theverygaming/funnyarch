@@ -72,6 +72,8 @@ class BackendFunnyarch(backends.Backend):
         if len(fn_inst.args) > 8:
             raise Exception("stack arguments unsupported")
 
+        fn_is_leaf = fn_inst.leaf
+
         # sometimes we need a temporary register, lets just permanently reserve one tehee :3
         tmpreg = "r26"
 
@@ -102,6 +104,20 @@ class BackendFunnyarch(backends.Backend):
                     raise Exception(f"reg {id_} never allocated?")
                 _free_regs.append(reg_map[id_])
                 del reg_map[id_]
+
+        def gen_call(name: str, regids_args: list[int], regid_return: int | None):
+            fn_is_leaf = False
+            _arg_regs = ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"]
+            regs_caller_save = _arg_regs[:max(len(fn_inst.args), len(regids_args))]
+            for reg in regs_caller_save:
+                write_l(f"strpi rsp, {reg}, #-4")
+            for i, reg in enumerate(regids_args):
+                write_l(f"mov {_arg_regs[i]}, {reg_map[reg]}")
+            write_l(f"rjal {name}")
+            if regid_return is not None:
+                write_l(f"mov {reg_map[regid_return]}, r0")
+            for reg in reversed(regs_caller_save):
+                write_l(f"ldri {reg}, rsp, #4")
 
         for inst in fn_inst.body:
             write_l(f"// IR: {inst}")
@@ -167,7 +183,16 @@ class BackendFunnyarch(backends.Backend):
                     ir.BinaryOperator.XOR: "xor",
                     ir.BinaryOperator.AND: "and",
                 }
-                write_l(f"{binop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_lhs]}, {reg_map[inst.regid_rhs]}")
+                if inst.op not in binop_inst_map:
+                    # generate calls for some operators
+                    binop_call_fn_map = {
+                        ir.BinaryOperator.MULT: "__libsupport_mult",
+                        #ir.BinaryOperator.DIV: "",
+                        #ir.BinaryOperator.MOD: "",
+                    }
+                    gen_call(binop_call_fn_map[inst.op], [inst.regid_lhs, inst.regid_rhs], inst.regid_result)
+                else:
+                    write_l(f"{binop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_lhs]}, {reg_map[inst.regid_rhs]}")
             elif isinstance(inst, ir.UnaryOp):
                 unaryop_inst_map = {
                     ir.UnaryOperator.BW_NOT: "not",
@@ -193,17 +218,7 @@ class BackendFunnyarch(backends.Backend):
             elif isinstance(inst, ir.FuncCall):
                 if inst.name is None:
                     raise Exception("function pointer calls not supported yet")
-                _arg_regs = ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"]
-                regs_caller_save = _arg_regs[:max(len(fn_inst.args), len(inst.regids_args))]
-                for reg in regs_caller_save:
-                    write_l(f"strpi rsp, {reg}, #-4")
-                for i, reg in enumerate(inst.regids_args):
-                    write_l(f"mov {_arg_regs[i]}, {reg_map[reg]}")
-                write_l(f"rjal {inst.name}")
-                if inst.regid_return is not None:
-                    write_l(f"mov {reg_map[inst.regid_return]}, r0")
-                for reg in reversed(regs_caller_save):
-                    write_l(f"ldri {reg}, rsp, #4")
+                gen_call(inst.name, inst.regids_args, inst.regid_return)
             elif isinstance(inst, ir.StartUseRegs):
                 alloc_regs(inst.regids)
             elif isinstance(inst, ir.EndUseRegs):
@@ -213,7 +228,7 @@ class BackendFunnyarch(backends.Backend):
 
         # function entry
         entry_asm = f"{fn_inst.name}:\n"
-        if not fn_inst.leaf:
+        if not fn_is_leaf:
             entry_asm += "  strpi rsp, lr, #-4\n"
         entry_asm += "  strpi rsp, rfp, #-4\n"
         entry_asm += "  mov rfp, rsp\n"
@@ -226,7 +241,7 @@ class BackendFunnyarch(backends.Backend):
         for reg in reversed(regs_callee_saved):
             write_l(f"ldri {reg}, rsp, #4")
         write_l("ldri rfp, rsp, #4")
-        if not fn_inst.leaf:
+        if not fn_is_leaf:
             write_l("ldri lr, rsp, #4")
         write_l("mov rip, lr")
 
