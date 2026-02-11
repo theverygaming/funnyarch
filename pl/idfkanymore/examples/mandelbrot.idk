@@ -2,8 +2,6 @@
 
 EXPORT VAR framebuffer: POINTER TO U32 = 0xF0000000;
 
-EXTERN PROCEDURE mult(a: REGISTER, b: REGISTER): REGISTER;
-
 EXPORT PROCEDURE main(): VOID;
 BEGIN
     mandelbrot();
@@ -44,11 +42,11 @@ BEGIN
                 // check if calculation escapes boundary
                 iteration = 0;
                 WHILE iteration < 128 DO
-                    y = (mult(x << 1, y) >>> 14) + cy;
+                    y = (((x << 1) * y) >>> 14) + cy;
                     x = ((x_2 - y_2) >>> 14) + cx;
 
-                    x_2 = mult(x, x);
-                    y_2 = mult(y, y);
+                    x_2 = x * x;
+                    y_2 = y * y;
 
                     // if yes within 128 iterations, make pixel white
                     IF (x_2 + y_2) > 0x40000000 THEN
@@ -63,7 +61,7 @@ BEGIN
                 _32 = _32 + 1;
             DONE
 
-            framebuffer[(mult(80, py) + (px >> 3)) >> 2] = pix32;
+            framebuffer[((80 * py) + (px >> 3)) >> 2] = pix32;
 
             px = px + 32;
         DONE
