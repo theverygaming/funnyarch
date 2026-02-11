@@ -17,12 +17,84 @@
                     let rom = new Uint8Array(8192);
                     rom.set(new Uint8Array(rawdata));
                     const computer = new funnyarchComputer(rom, new Uint8Array(4096), serialcon.addText.bind(serialcon), document.getElementById("screen"));
+                    
+                    function runPuterMeasured(n_instrs) {
+                        const start = performance.now();
+                        computer.run(n_instrs);
+                        const duration = performance.now() - start;
 
-                    function runPuter() {
-                        computer.run(10000);
+                        const instrs_per_ms_measured = n_instrs / duration;
+                        return instrs_per_ms_measured;
+                    }
+
+                    let instrs_per_ms;
+
+                    function runPuterForMs(ms) {
+                        const n_instrs = Math.floor(Math.max(1, instrs_per_ms * ms));
+
+                        const instrs_per_ms_measured = runPuterMeasured(n_instrs);
+
+                        // slow positive adjustment to avoid jitter, faster negative adjustment 
+                        const ADJ_PCT = instrs_per_ms < instrs_per_ms_measured ? 0.05 : 0.5;
+                        instrs_per_ms = (instrs_per_ms * (1 - ADJ_PCT)) + (instrs_per_ms_measured * ADJ_PCT);
+
+                        // decrease by 1% per frame to keep FPS stable even if running long
+                        instrs_per_ms = (instrs_per_ms * (1 - 0.01));
+                    }
+
+                    let frameTime = 1000 / 60;
+                    function runPuter(timestamp) {
+                        // keep 5% safety margin
+                        const runDuration = (frameTime * 0.95);
+
+                        const start = performance.now();
+                        const DIVISIONS = 5;
+                        for (let i = 0; i < DIVISIONS; i++) {
+                            runPuterForMs(runDuration / DIVISIONS);
+
+                            // abort if we are to running too long
+                            if (performance.now() - start > runDuration) {
+                                break;
+                            }
+                        }
                         window.requestAnimationFrame(runPuter);
                     }
-                    window.requestAnimationFrame(runPuter);
+
+                    async function measureFPS(sampleTimeMs) {
+                        return new Promise(resolve => {
+                            let last;
+                            let frames = 0;
+                            let total = 0;
+
+                            function loop(timestamp) {
+                                if (last !== undefined) {
+                                    total += timestamp - last;
+                                    frames++;
+                                }
+
+                                last = timestamp;
+
+                                if (total >= sampleTimeMs) {
+                                    const avgMs = total / frames;
+                                    const fps = 1000 / avgMs;
+                                    resolve(fps);
+                                    return;
+                                }
+
+                                requestAnimationFrame(loop);
+                            }
+
+                            requestAnimationFrame(loop);
+                        });
+                    }
+
+                    measureFPS(500).then((fps) => {
+                        console.log(`estimated FPS at ${fps}`);
+                        frameTime = 1000 / fps;
+                        // estimate initial value to get running fast fairly quickly
+                        instrs_per_ms = runPuterMeasured(10000);
+                        window.requestAnimationFrame(runPuter);
+                    });
                 });
         }
     </script>
