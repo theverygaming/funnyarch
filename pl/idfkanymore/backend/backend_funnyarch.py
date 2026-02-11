@@ -181,7 +181,7 @@ class BackendFunnyarch(backends.Backend):
                     ir.CompareOperator.GT: "ifgt",
                     ir.CompareOperator.GTEQ: "ifgteq",
                 }
-                write_l(f"cmp {reg_map[inst.regid_rhs]}, {reg_map[inst.regid_lhs]}")
+                write_l(f"cmp {reg_map[inst.regid_lhs]}, {reg_map[inst.regid_rhs]}")
                 write_l(f"mov {reg_map[inst.regid_result]}, #0")
                 write_l(f"{cmpop_map[inst.op]} mov {reg_map[inst.regid_result]}, #1")
             elif isinstance(inst, ir.FuncReturn):
