@@ -201,11 +201,11 @@ class BackendFunnyarch(backends.Backend):
         # function entry
         entry_asm = f"{fn_inst.name}:\n"
         if not fn_inst.leaf:
-            entry_asm += "  strpi rsp, lr, #-4"
-        entry_asm += "  strpi rsp, rfp, #-4"
-        entry_asm += "  mov rfp, rsp"
+            entry_asm += "  strpi rsp, lr, #-4\n"
+        entry_asm += "  strpi rsp, rfp, #-4\n"
+        entry_asm += "  mov rfp, rsp\n"
         for reg in regs_callee_saved:
-            entry_asm += f"  strpi rsp, {reg}, #-4"
+            entry_asm += f"  strpi rsp, {reg}, #-4\n"
         asm = entry_asm + asm
 
         # function exit
