@@ -139,6 +139,7 @@ def parse_if(ctx, node, bubble):
     if_chain += map(list, node.elsif)
     if node.else_ is not None:
         if_chain.append([None, node.else_])
+    lbl_if_end = ctx.alloc_label()
 
     # generate a label for each branch that isn't the first, and add labels for the next
     for i in reversed(range(len(if_chain))):
@@ -153,6 +154,9 @@ def parse_if(ctx, node, bubble):
         # everything other than last one has a else label
         if i != len(if_chain) - 1:
             lbl_else = if_chain[i+1][2]
+        # the last one has the end label as else
+        else:
+            lbl_else = lbl_if_end
         if_chain[i].append(lbl_else)
 
     # generate code
@@ -160,5 +164,6 @@ def parse_if(ctx, node, bubble):
         if lbl_self is not None:
             ret.append(ir.LocalLabel(lbl_self))
         ret += _gen_simple_if(cond, body.statements, lbl_else)
+    ret.append(ir.LocalLabel(lbl_if_end))
 
     return ret
