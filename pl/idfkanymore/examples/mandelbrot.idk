@@ -44,7 +44,7 @@ BEGIN
                 // check if calculation escapes boundary
                 iteration = 0;
                 WHILE iteration < 128 DO
-                    y = (mult(mult(x, 2), y) >>> 14) + cy;
+                    y = (mult(x << 1, y) >>> 14) + cy;
                     x = ((x_2 - y_2) >>> 14) + cx;
 
                     x_2 = mult(x, x);
