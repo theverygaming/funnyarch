@@ -58,6 +58,7 @@ pointer_index: variable _LBRACKET expression _RBRACKET
 ?bitshift: sum
          | bitshift BW_SHIFT_LEFT sum -> binop
          | bitshift BW_SHIFT_RIGHT sum -> binop
+         | bitshift BW_AR_SHIFT_RIGHT sum -> binop
 
 ?sum: product
     | sum PLUS product -> binop
@@ -135,6 +136,7 @@ DIVIDE: "/"
 REMAINDER: "%"
 BW_SHIFT_LEFT: "<<"
 BW_SHIFT_RIGHT: ">>"
+BW_AR_SHIFT_RIGHT: ">>>"
 BW_AND: "&"
 BW_NOT: "~"
 BW_OR: "|"

@@ -162,6 +162,7 @@ class BackendFunnyarch(backends.Backend):
                     #ir.BinaryOperator.MOD: "",
                     ir.BinaryOperator.LSHIFT: "shl",
                     ir.BinaryOperator.RSHIFT: "shr",
+                    ir.BinaryOperator.ARSHIFT: "sar",
                     ir.BinaryOperator.OR: "or",
                     ir.BinaryOperator.XOR: "xor",
                     ir.BinaryOperator.AND: "and",

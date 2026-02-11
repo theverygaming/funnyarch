@@ -177,9 +177,10 @@ class BinaryOperator(BaseIrObj, enum.Enum):
     MOD = 5
     LSHIFT = 6
     RSHIFT = 7
-    OR = 8
-    XOR = 9
-    AND = 10
+    ARSHIFT = 8
+    OR = 9
+    XOR = 10
+    AND = 11
 
     @classmethod
     def from_ast_op(cls, ast_op):
@@ -191,6 +192,7 @@ class BinaryOperator(BaseIrObj, enum.Enum):
             ast_mod.BinaryOperatorType.REMAINDER: cls.MOD,
             ast_mod.BinaryOperatorType.BW_SHIFT_LEFT: cls.LSHIFT,
             ast_mod.BinaryOperatorType.BW_SHIFT_RIGHT: cls.RSHIFT,
+            ast_mod.BinaryOperatorType.BW_AR_SHIFT_RIGHT: cls.ARSHIFT,
             ast_mod.BinaryOperatorType.BW_OR: cls.OR,
             ast_mod.BinaryOperatorType.BW_XOR: cls.XOR,
             ast_mod.BinaryOperatorType.BW_AND: cls.AND,

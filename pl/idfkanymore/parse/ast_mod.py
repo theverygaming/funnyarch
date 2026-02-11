@@ -21,6 +21,7 @@ class BinaryOperatorType(enum.Enum):
     REMAINDER = "%"
     BW_SHIFT_LEFT = "<<"
     BW_SHIFT_RIGHT = ">>"
+    BW_AR_SHIFT_RIGHT = ">>>"
     BW_AND = "&"
     BW_OR = "|"
     BW_XOR = "^"
