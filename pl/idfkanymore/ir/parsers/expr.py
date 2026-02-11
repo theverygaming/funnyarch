@@ -46,7 +46,7 @@ def eval_expr(ctx, expr, dest_vreg_id):
                     ir.StartUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
                     ir.GetGlobalPtr(tmp_vreg_ptr, expr.name),
                     ir.SetRegImm(tmp_vreg_idx, 0),
-                    ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, dest_vreg_id, var_found["val"]["type"]),
+                    ir.GetPtrReg(dest_vreg_id, tmp_vreg_ptr, tmp_vreg_idx, var_found["val"]["type"]),
                     ir.EndUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
                 ]
     elif isinstance(expr, ast_mod.Binop):
