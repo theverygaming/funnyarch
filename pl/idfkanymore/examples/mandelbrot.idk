@@ -1,0 +1,83 @@
+// based on the assembly mandelbrot example
+
+EXPORT VAR serial_data: POINTER TO U32 = 0xF004B000;
+
+EXPORT VAR framebuffer: POINTER TO U32 = 0xF0000000;
+
+EXTERN PROCEDURE mult(a: REGISTER, b: REGISTER): REGISTER;
+
+EXPORT PROCEDURE main(): VOID;
+BEGIN
+    framebuffer[0] = 0xFF;
+    mandelbrot();
+END
+
+EXPORT PROCEDURE mandelbrot(): U8;
+VARS
+    px: U32;
+    py: U32;
+    cx: U32;
+    cy: U32;
+    pix32: U32;
+    _32: U8;
+BEGIN
+    py = 0;
+    cy = 0xffffc000;
+    WHILE py < 480 DO
+        cx = 0xffff7000;
+
+        // iterate over 4-byte words
+        px = 0;
+        WHILE px < 640 DO
+            pix32 = 0;
+
+            // iterate over 32 pixels represented by that word
+            WHILE _32 < 32 DO
+                IF check_iteration() THEN
+                    pix32 = pix32 | (1 << _32);
+                END
+                cx = cx + 0x4c;
+
+                _32 = _32 + 1;
+            DONE
+
+            framebuffer[mult(80, py) >> 3] = pix32;
+
+            px = px + 32;
+        DONE
+        cy = cy + 0x44;
+    DONE
+END
+
+EXPORT PROCEDURE check_iteration(cy: U32, cx: U32): U8;
+VARS
+    x: U32;
+    y: U32;
+    x_2: U32;
+    y_2: U32;
+    iteration: U32;
+BEGIN
+    x = 0;
+    y = 0;
+    x_2 = 0;
+    y_2 = 0;
+
+    // check if calculation escapes boundary
+    iteration = 0;
+    WHILE iteration < 128 DO
+        y = mult(mult(x << 1), y) >> 14 + cy;
+        x = (x_2 - y_2) >> 14 + cx;
+
+        x_2 = mult(x, x);
+        y_2 = mult(y, y);
+
+        // if yes within 128 iterations, make pixel white
+        IF x_2 + y_2 > 128 THEN
+            RETURN 1;
+        END
+
+        iteration = iteration + 1;
+    DONE
+
+    RETURN 0;
+END
