@@ -167,6 +167,11 @@ class BackendFunnyarch(backends.Backend):
                     ir.BinaryOperator.AND: "and",
                 }
                 write_l(f"{binop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_rhs]}, {reg_map[inst.regid_lhs]}")
+            elif isinstance(inst, ir.UnaryOp):
+                unaryop_inst_map = {
+                    ir.UnaryOperator.BW_NOT: "not",
+                }
+                write_l(f"{unaryop_inst_map[inst.op]} {reg_map[inst.regid_result]}, {reg_map[inst.regid_rhs]}")
             elif isinstance(inst, ir.FuncReturn):
                 write_l(f"mov r0, {reg_map[inst.regid_retval]}")
                 fn_ret()
