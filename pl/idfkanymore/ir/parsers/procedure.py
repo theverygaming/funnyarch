@@ -13,10 +13,13 @@ def gen_call(ctx, fn_name, arg_expr_list, retval_vreg=None):
         # FIXME: args types???? Check fn signature??? # BUG:
         tmp_arg_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
         arg_vregs.append(tmp_arg_vreg)
+        ret.append(ir.StartUseRegs([tmp_arg_vreg]))
         ret += expr.eval_expr(ctx, arg_expr, tmp_arg_vreg)
     tmp_fnptr_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
     ret += [
+        ir.StartUseRegs([tmp_fnptr_vreg]),
         ir.FuncCall(None, fn_name, arg_vregs, retval_vreg),
+        ir.EndUseRegs(arg_vregs + [tmp_fnptr_vreg]),
     ]
     return ret
 
@@ -39,19 +42,22 @@ def parse_procedure_def(ctx, node, bubble):
     ctx.proc_closest_loop_continue_label = None
     ctx.proc_return_type = ctx.lookup_type(node.prototype.return_type)
 
+    body = []
+
     for name, t in args:
         ctx.proc_locals[name] = {
             "kind": "arg",
             "type": t,
         }
     for name, t in localvars:
+        localvar_vreg = ctx.alloc_vreg(t)
+        body.append(ir.StartUseRegs([localvar_vreg]))
         ctx.proc_locals[name] = {
             "kind": "var",
             "type": t,
-            "regid": ctx.alloc_vreg(t),
+            "regid": localvar_vreg,
         }
 
-    body = []
     for n in node.block.statements:
         body += bubble(n)
 

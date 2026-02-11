@@ -226,3 +226,13 @@ class UnaryOp(IrInstrObj):
     regid_result: int
     op: UnaryOperator
     regid_rhs: int
+
+
+@dataclasses.dataclass
+class StartUseRegs(BaseIrObj):
+    regids: list[int]
+
+
+@dataclasses.dataclass
+class EndUseRegs(BaseIrObj):
+    regids: list[int]

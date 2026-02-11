@@ -52,7 +52,7 @@ class BackendFunnyarch(backends.Backend):
         def write_l(s):
             nonlocal asm
             asm += "  " + s + "\n"
-        
+
         def fn_ret():
             write_l(f"rjmp .{fn_inst.name}_exit")
 
@@ -80,23 +80,28 @@ class BackendFunnyarch(backends.Backend):
         _free_regs = [
             "r8","r9","r10","r11","r12","r13","r14","r15","r16","r17","r18","r19","r20","r21","r22","r23","r24","r25", #"r26"
         ]
-        freeregs_idx = 0
-        for id_ in fn_inst.regs:
-            if freeregs_idx >= len(_free_regs):
-                return f"// SKILL ISSUE: ran out of registers for function {fn_inst.name} (need {len(fn_inst.regs)}, got {len(_free_regs)} registers)"
-                raise Exception(f"ran out of registers to use in fn {fn_inst.name} (need {len(fn_inst.regs)}, got {len(_free_regs)} registers)")
-            reg_map[id_] = _free_regs[freeregs_idx]
-            freeregs_idx += 1
-        regs_callee_saved = list(reg_map.values()) + ["r26"]
+        regs_callee_saved = ["r26"]
 
-        # function entry
-        asm += f"{fn_inst.name}:\n"
-        if not fn_inst.leaf:
-            write_l("strpi rsp, lr, #-4")
-        write_l("strpi rsp, rfp, #-4")
-        write_l("mov rfp, rsp")
-        for reg in regs_callee_saved:
-            write_l(f"strpi rsp, {reg}, #-4")
+        def alloc_regs(regs: list[int]):
+            freeregs_idx = 0
+            for id_ in regs:
+                if id_ in reg_map:
+                    raise Exception(f"reg {id_} already allocated?")
+                if freeregs_idx >= len(_free_regs):
+                    raise Exception(f"ran out of registers to use in fn {fn_inst.name} (need at least {len(regs)} more, got {len(_free_regs)} registers free)")
+                reg_map[id_] = _free_regs[freeregs_idx]
+                _free_regs.pop(freeregs_idx)
+                if reg_map[id_] not in regs_callee_saved:
+                    regs_callee_saved.append(reg_map[id_])
+                freeregs_idx += 1
+            write_l(f"// register use stat: {len(reg_map)}/{len(reg_map)+len(_free_regs)}")
+
+        def dealloc_regs(regs: list[int]):
+            for id_ in regs:
+                if id_ not in reg_map:
+                    raise Exception(f"reg {id_} never allocated?")
+                _free_regs.append(reg_map[id_])
+                del reg_map[id_]
 
         for inst in fn_inst.body:
             write_l(f"// IR: {inst}")
@@ -181,9 +186,24 @@ class BackendFunnyarch(backends.Backend):
                     write_l(f"mov {reg_map[inst.regid_return]}, r0")
                 for reg in reversed(regs_caller_save):
                     write_l(f"ldri {reg}, rsp, #4")
+            elif isinstance(inst, ir.StartUseRegs):
+                alloc_regs(inst.regids)
+            elif isinstance(inst, ir.EndUseRegs):
+                dealloc_regs(inst.regids)
             else:
                 raise Exception(f"unknown IR instr {inst}")
 
+        # function entry
+        entry_asm = f"{fn_inst.name}:\n"
+        if not fn_inst.leaf:
+            entry_asm += "  strpi rsp, lr, #-4"
+        entry_asm += "  strpi rsp, rfp, #-4"
+        entry_asm += "  mov rfp, rsp"
+        for reg in regs_callee_saved:
+            entry_asm += f"  strpi rsp, {reg}, #-4"
+        asm = entry_asm + asm
+
+        # function exit
         write_l(f".{fn_inst.name}_exit:")
         for reg in reversed(regs_callee_saved):
             write_l(f"ldri {reg}, rsp, #4")

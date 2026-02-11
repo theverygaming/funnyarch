@@ -18,6 +18,7 @@ def parse_assignment(ctx, node, bubble):
             val_vreg = dst["regid"]
         else:
             val_vreg = ctx.alloc_vreg(dst["type"])
+            ret.append(ir.StartUseRegs([val_vreg]))
 
         ret += expr.eval_expr(ctx, node.value, val_vreg)
 
@@ -25,9 +26,11 @@ def parse_assignment(ctx, node, bubble):
             tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
             tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
             ret += [
+                ir.StartUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
                 ir.GetGlobalPtr(tmp_vreg_ptr, var_name),
                 ir.SetRegImm(tmp_vreg_idx, 0),
                 ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, val_vreg, dst["type"]),
+                ir.EndUseRegs([val_vreg, tmp_vreg_ptr, tmp_vreg_idx]),
             ]
     elif isinstance(node.to, ast_mod.PointerIndex):
         var_name = node.to.var
@@ -35,8 +38,10 @@ def parse_assignment(ctx, node, bubble):
         dst = var_found["val"]
 
         val_vreg = ctx.alloc_vreg(dst["type"].to)
+        ret.append(ir.StartUseRegs([val_vreg]))
         ret += expr.eval_expr(ctx, node.value, val_vreg)
         idx_vreg = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+        ret.append(ir.StartUseRegs([idx_vreg]))
         ret += expr.eval_expr(ctx, node.to.index_exp, idx_vreg)
 
         match var_found["type"]:
@@ -44,19 +49,29 @@ def parse_assignment(ctx, node, bubble):
                 ptr_vreg = dst["regid"]
             case "arg":
                 ptr_vreg = ctx.alloc_vreg(dst["type"])
+                ret.append(ir.StartUseRegs([ptr_vreg]))
                 ret.append(ir.GetArgVal(ptr_vreg, var_name))
             case "global":
                 ptr_vreg = ctx.alloc_vreg(dst["type"])
                 gbl_ptr_vreg = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
                 tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
                 ret += [
+                    ir.StartUseRegs([gbl_ptr_vreg, tmp_vreg_idx]),
                     ir.GetGlobalPtr(gbl_ptr_vreg, var_name),
                     ir.SetRegImm(tmp_vreg_idx, 0),
+                    ir.StartUseRegs([ptr_vreg]),
                     ir.GetPtrReg(ptr_vreg, gbl_ptr_vreg, tmp_vreg_idx, ctx.proc_regs[gbl_ptr_vreg].to),
+                    ir.EndUseRegs([gbl_ptr_vreg, tmp_vreg_idx]),
                 ]
             case _:
                 raise Exception(f"pointer index assignment: unsupported var type {var_found['type']}")
         ret.append(ir.SetPtrReg(ptr_vreg, idx_vreg, val_vreg, ctx.proc_regs[ptr_vreg].to))
+        ret.append(ir.EndUseRegs([val_vreg, idx_vreg]))
+        match var_found["type"]:
+            case "arg":
+                ret.append(ir.EndUseRegs([ptr_vreg]))
+            case "global":
+                ret.append(ir.EndUseRegs([ptr_vreg]))
     else:
         raise Exception("qwhar??")
     return ret
@@ -65,8 +80,10 @@ def parse_assignment(ctx, node, bubble):
 def parse_return(ctx, node, bubble):
     ret = []
     dst_vreg = ctx.alloc_vreg(ctx.proc_return_type)
+    ret.append(ir.StartUseRegs([dst_vreg]))
     ret += expr.eval_expr(ctx, node.expr, dst_vreg)
     ret.append(ir.FuncReturn(dst_vreg))
+    ret.append(ir.EndUseRegs([dst_vreg]))
     return ret
 
 @irgen.reg_ast_node_parser((ast_mod.While,), end_only=True)
@@ -88,8 +105,10 @@ def parse_while(ctx, node, bubble):
 
     return ([
         ir.LocalLabel(lbl_start),
+        ir.StartUseRegs([cond_vreg]),
     ] + expr.eval_expr(ctx, node.cond, cond_vreg) + [
         ir.JumpLocalLabelCondFalsy(lbl_end, cond_vreg),
+        ir.EndUseRegs([cond_vreg]),
     ] + body + [
         ir.JumpLocalLabel(lbl_start),
         ir.LocalLabel(lbl_end),
@@ -102,8 +121,10 @@ def parse_if(ctx, node, bubble):
 
         if cond is not None:
             cond_vreg = ctx.alloc_vreg(ctx.datatypes["REGISTER"])
+            ret.append(ir.StartUseRegs([cond_vreg]))
             ret += expr.eval_expr(ctx, cond, cond_vreg)
             ret.append(ir.JumpLocalLabelCondFalsy(lbl_else, cond_vreg))
+            ret.append(ir.EndUseRegs([cond_vreg]))
 
         for n in body:
             ret += bubble(n)

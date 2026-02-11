@@ -43,17 +43,24 @@ def eval_expr(ctx, expr, dest_vreg_id):
                 tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
                 tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
                 return [
+                    ir.StartUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
                     ir.GetGlobalPtr(tmp_vreg_ptr, expr.name),
                     ir.SetRegImm(tmp_vreg_idx, 0),
                     ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, dest_vreg_id, var_found["val"]["type"]),
+                    ir.EndUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
                 ]
     elif isinstance(expr, ast_mod.Binop):
         tmp_vreg_lhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
         tmp_vreg_rhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
         return (
-            eval_expr(ctx, expr.lhs, tmp_vreg_lhs)
+            [ir.StartUseRegs([tmp_vreg_lhs])]
+            + eval_expr(ctx, expr.lhs, tmp_vreg_lhs)
+            + [ir.StartUseRegs([tmp_vreg_rhs])]
             + eval_expr(ctx, expr.rhs, tmp_vreg_rhs)
-            + [ir.BinOp(dest_vreg_id, tmp_vreg_lhs, ir.BinaryOperator.from_ast_op(expr.operator), tmp_vreg_rhs)]
+            + [
+                ir.BinOp(dest_vreg_id, tmp_vreg_lhs, ir.BinaryOperator.from_ast_op(expr.operator), tmp_vreg_rhs),
+                ir.EndUseRegs([tmp_vreg_lhs, tmp_vreg_rhs]),
+            ]
         )
     elif isinstance(expr, ast_mod.ProcedureCall):
         return procedure.gen_call(ctx, expr.name, expr.args, dest_vreg_id)
@@ -66,28 +73,42 @@ def eval_expr(ctx, expr, dest_vreg_id):
                 tmp_vreg_ptr = var_found["val"]["regid"]
             case "arg":
                 tmp_vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
+                ret.append(ir.StartUseRegs([tmp_vreg_ptr]))
                 ret.append(ir.GetArgVal(tmp_vreg_ptr, expr.var))
             case "global":
                 tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
+                ret.append(ir.StartUseRegs([tmp_vreg_ptr]))
                 ret.append(ir.GetGlobalPtr(tmp_vreg_ptr, expr.var))
 
         tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+        ret.append(ir.StartUseRegs([tmp_vreg_idx]))
         ret += eval_expr(ctx, expr.index_exp, tmp_vreg_idx)
         ret.append(ir.GetPtrReg(dest_vreg_id, tmp_vreg_ptr, tmp_vreg_idx, ctx.proc_regs[tmp_vreg_ptr].to))
+        ret.append(ir.EndUseRegs([tmp_vreg_idx]))
+        match var_found["type"]:
+            case "arg":
+                ret.append(ir.EndUseRegs([tmp_vreg_ptr]))
+            case "global":
+                ret.append(ir.EndUseRegs([tmp_vreg_ptr]))
         return ret
     elif isinstance(expr, ast_mod.Comparison):
         tmp_vreg_lhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
         tmp_vreg_rhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
         return (
-            eval_expr(ctx, expr.lhs, tmp_vreg_lhs)
+            [ir.StartUseRegs([tmp_vreg_lhs])]
+            + eval_expr(ctx, expr.lhs, tmp_vreg_lhs)
+            + [ir.StartUseRegs([tmp_vreg_rhs])]
             + eval_expr(ctx, expr.rhs, tmp_vreg_rhs)
             + [ir.Compare(dest_vreg_id, tmp_vreg_lhs, ir.CompareOperator.from_ast_op(expr.operator), tmp_vreg_rhs)]
+            + [ir.EndUseRegs([tmp_vreg_lhs, tmp_vreg_rhs])]
         )
     elif isinstance(expr, ast_mod.Unaryop):
         tmp_vreg = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
         return (
-            eval_expr(ctx, expr.expr, tmp_vreg)
+            [ir.StartUseRegs([tmp_vreg])]
+            + eval_expr(ctx, expr.expr, tmp_vreg)
             + [ir.UnaryOp(dest_vreg_id, ir.UnaryOperator.from_ast_op(expr.operator), tmp_vreg)]
+            + [ir.EndUseRegs([tmp_vreg])]
         )
 
     raise NotImplementedError(f"unknown expr {expr}")
