@@ -128,7 +128,7 @@ class BackendFunnyarch(backends.Backend):
                 write_l(f".{fn_inst.name}_{inst.label}:")
             elif isinstance(inst, ir.GetArgVal):
                 _arg_regs = ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"]
-                # FIXME: refine args layout, this is bullshit lmao.. Maybe make a dict of tuples name: (idx, type)?
+                # FIXME: refine args layout, this is bullshit lmao.. Maybe make a dict of tuples name: (pos, type)?
                 _arg_idx = [i for i, (name, t) in enumerate(fn_inst.args) if name == inst.arg_name][0]
                 write_l(f"mov {reg_map[inst.regid_dst]}, {_arg_regs[_arg_idx]}")
             elif isinstance(inst, ir.CopyReg):
@@ -183,6 +183,9 @@ class BackendFunnyarch(backends.Backend):
                     ir.BinaryOperator.OR: "or",
                     ir.BinaryOperator.XOR: "xor",
                     ir.BinaryOperator.AND: "and",
+                    # FIXME: this won't work in all cases!
+                    ir.BinaryOperator.LOGICAL_AND: "and",
+                    ir.BinaryOperator.LOGICAL_OR: "or",
                 }
                 if inst.op not in binop_inst_map:
                     # generate calls for some operators

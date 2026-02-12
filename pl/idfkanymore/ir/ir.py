@@ -180,6 +180,8 @@ class BinaryOperator(BaseIrObj, enum.Enum):
     OR = 9
     XOR = 10
     AND = 11
+    LOGICAL_AND = 12
+    LOGICAL_OR = 13
 
     @classmethod
     def from_ast_op(cls, ast_op):
@@ -195,6 +197,8 @@ class BinaryOperator(BaseIrObj, enum.Enum):
             ast_mod.BinaryOperatorType.BW_OR: cls.OR,
             ast_mod.BinaryOperatorType.BW_XOR: cls.XOR,
             ast_mod.BinaryOperatorType.BW_AND: cls.AND,
+            ast_mod.BinaryOperatorType.LOGICAL_AND: cls.LOGICAL_AND,
+            ast_mod.BinaryOperatorType.LOGICAL_OR: cls.LOGICAL_OR,
         }
         if ast_op not in transl:
             raise Exception(f"cannot translate operator {ast_op}")
