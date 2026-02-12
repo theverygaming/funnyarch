@@ -106,6 +106,7 @@ class BackendFunnyarch(backends.Backend):
                 del reg_map[id_]
 
         def gen_call(name: str, regids_args: list[int], regid_return: int | None):
+            nonlocal fn_is_leaf
             fn_is_leaf = False
             _arg_regs = ["r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7"]
             regs_caller_save = _arg_regs[:max(len(fn_inst.args), len(regids_args))]
