@@ -70,26 +70,35 @@ def eval_expr(ctx, expr, dest_vreg_id):
         var_found = find_variable(ctx, expr.var)
         match var_found["type"]:
             case "var":
-                tmp_vreg_ptr = var_found["val"]["regid"]
+                vreg_ptr = var_found["val"]["regid"]
             case "arg":
-                tmp_vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
-                ret.append(ir.StartUseRegs([tmp_vreg_ptr]))
-                ret.append(ir.GetArgVal(tmp_vreg_ptr, expr.var))
+                vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
+                ret.append(ir.StartUseRegs([vreg_ptr]))
+                ret.append(ir.GetArgVal(vreg_ptr, expr.var))
             case "global":
-                tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
-                ret.append(ir.StartUseRegs([tmp_vreg_ptr]))
-                ret.append(ir.GetGlobalPtr(tmp_vreg_ptr, expr.var))
+                tmp_vreg_global_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
+                tmp_vreg_idx_global = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+                vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
+                ret += [
+                    ir.StartUseRegs([tmp_vreg_global_ptr]),
+                    ir.GetGlobalPtr(tmp_vreg_global_ptr, expr.var),
+                    ir.StartUseRegs([vreg_ptr]),
+                    ir.StartUseRegs([tmp_vreg_idx_global]),
+                    ir.SetRegImm(tmp_vreg_idx_global, 0),
+                    ir.GetPtrReg(vreg_ptr, tmp_vreg_global_ptr, tmp_vreg_idx_global, ctx.proc_regs[tmp_vreg_global_ptr]),
+                    ir.EndUseRegs([tmp_vreg_global_ptr, tmp_vreg_idx_global]),
+                ]
 
         tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
         ret.append(ir.StartUseRegs([tmp_vreg_idx]))
         ret += eval_expr(ctx, expr.index_exp, tmp_vreg_idx)
-        ret.append(ir.GetPtrReg(dest_vreg_id, tmp_vreg_ptr, tmp_vreg_idx, ctx.proc_regs[tmp_vreg_ptr].to))
+        ret.append(ir.GetPtrReg(dest_vreg_id, vreg_ptr, tmp_vreg_idx, ctx.proc_regs[vreg_ptr].to))
         ret.append(ir.EndUseRegs([tmp_vreg_idx]))
         match var_found["type"]:
             case "arg":
-                ret.append(ir.EndUseRegs([tmp_vreg_ptr]))
+                ret.append(ir.EndUseRegs([vreg_ptr]))
             case "global":
-                ret.append(ir.EndUseRegs([tmp_vreg_ptr]))
+                ret.append(ir.EndUseRegs([vreg_ptr]))
         return ret
     elif isinstance(expr, ast_mod.Comparison):
         tmp_vreg_lhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
