@@ -1,0 +1,5 @@
+EXPORT PROCEDURE kmain(): VOID;
+BEGIN
+    WHILE 1 DO
+    DONE
+END

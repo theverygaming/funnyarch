@@ -1,3 +1,5 @@
+#include "../common/macros.asm"
+
 // void switch(struct ctx **old, struct ctx *_new);
 switch:
 push(lr)
