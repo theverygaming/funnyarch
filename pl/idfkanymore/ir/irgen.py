@@ -102,7 +102,7 @@ class IrGenContext:
         irl = []
         for k, v in self.globalvars.items():
             if v["def"]:
-                irl.append(ir.GlobalVarDef(k, v["type"], v["value"], True))
+                irl.append(ir.GlobalVarDef(k, v["type"], v["value"], True, v["attributes"]))
         return irl
 
     @classmethod

@@ -63,5 +63,6 @@ def parse_globalvar_def(ctx, node, bubble):
         "type": t,
         "value": _compute_constant_expr(node.value),
         "def": True,
+        "attributes": {a.name: a.args for a in node.attributes},
     }
     return []

@@ -30,6 +30,7 @@ def eval_expr(ctx, expr, dest_vreg_id):
                     "type": ir.DatatypeArray(ctx.datatypes["U8"], len(expr.value) + 1),
                     "value": [ord(c) for c in expr.value] + [0],
                     "def": True,
+                    "attributes": {},
                 }
             return [ir.GetGlobalPtr(dest_vreg_id, varname)]
     elif isinstance(expr, ast_mod.Variable):

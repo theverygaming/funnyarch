@@ -67,6 +67,7 @@ def parse_procedure_def(ctx, node, bubble):
             ctx.proc_regs,
             body,
             True,
+            {a.name: a.args for a in node.prototype.attributes},
         )
     ]
 

@@ -43,6 +43,7 @@ class GlobalVarDef(IrInstrObj):
     type_: Datatype
     value: object
     export: bool
+    attributes: dict[str, str | int]
 
 
 @dataclasses.dataclass
@@ -53,6 +54,7 @@ class Function(IrInstrObj):
     regs: dict[int, Datatype]
     body: list[IrInstrObj]
     export: bool
+    attributes: dict[str, str | int]
 
 
 @dataclasses.dataclass
