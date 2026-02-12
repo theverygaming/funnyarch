@@ -115,6 +115,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Weird compiler")
     parser.add_argument(
+        "--origin", metavar="origin", help="origin", default=0, type=int
+    )
+    parser.add_argument(
         "-o", "--output", metavar="output", help="output file name", required=True, type=str
     )
     parser.add_argument("input", metavar="input", help="input file names", type=str, nargs="+")
@@ -122,7 +125,7 @@ if __name__ == "__main__":
 
     ld = Linker(
         {
-            "start": 0,
+            "start": args.origin,
             "sections": [
                 {"name": ".entry"},
                 {"name": ".text"},
