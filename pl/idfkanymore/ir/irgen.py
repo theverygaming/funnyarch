@@ -37,7 +37,6 @@ class IrGenContext:
 
     # specific when inside procedures
     proc_locals = None
-    proc_is_leaf = None
     proc_vreg_counter = None
     proc_regs = None
     proc_label_counter = None

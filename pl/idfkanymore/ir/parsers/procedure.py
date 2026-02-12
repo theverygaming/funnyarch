@@ -5,7 +5,6 @@ from .. import irgen as irgen
 from . import expr
 
 def gen_call(ctx, fn_name, arg_expr_list, retval_vreg=None):
-    ctx.proc_is_leaf = False
     # FIXME: verify fn name??
     ret = []
     arg_vregs = []
@@ -34,7 +33,6 @@ def parse_procedure_def(ctx, node, bubble):
     localvars = [(var.name, ctx.lookup_type(var.type_)) for var in node.vars_]
 
     ctx.proc_locals = {}
-    ctx.proc_is_leaf = True
     ctx.proc_vreg_counter = -1
     ctx.proc_regs = {}
     ctx.proc_label_counter = -1
@@ -64,7 +62,6 @@ def parse_procedure_def(ctx, node, bubble):
     return [
         ir.Function(
             node.prototype.name,
-            ctx.proc_is_leaf,
             args,
             ctx.proc_return_type,
             ctx.proc_regs,

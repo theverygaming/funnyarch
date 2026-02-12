@@ -48,7 +48,6 @@ class GlobalVarDef(IrInstrObj):
 @dataclasses.dataclass
 class Function(IrInstrObj):
     name: str
-    leaf: bool
     args: list[tuple[str, Datatype]]
     return_type: Datatype
     regs: dict[int, Datatype]

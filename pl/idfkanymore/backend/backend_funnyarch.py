@@ -72,7 +72,7 @@ class BackendFunnyarch(backends.Backend):
         if len(fn_inst.args) > 8:
             raise Exception("stack arguments unsupported")
 
-        fn_is_leaf = fn_inst.leaf
+        fn_is_leaf = True
 
         # sometimes we need a temporary register, lets just permanently reserve one tehee :3
         tmpreg = "r26"
