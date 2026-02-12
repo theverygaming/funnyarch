@@ -1,7 +1,85 @@
 "use strict";
 
+class funnyarchHDD {
+    constructor(dataArray) {
+        if (!(dataArray instanceof Uint8Array)) {
+            throw new Error("Invalid HDD dataArray type");
+        }
+        if ((dataArray.length % 512) != 0) {
+            throw new Error("HDD size must be divisible by 512");
+        }
+        
+        this.dataArray = dataArray;
+
+        // state
+        this.command = 0; // 0 = none, 1 = read, 2 = write
+        this.finished = false;
+        this.sector_idx = 0;
+        this.numsectors = dataArray.length / 512;
+        this.databuf = new Uint8Array(512);
+    }
+
+    readMMIO(address) {
+        // HDD control/status register
+        if (address == 0xF004B004) {
+            return (this.command & 0b11) | (this.finished ? 0b100 : 0) | ((this.sector_idx & 0x1FFFFFFF) << 3);
+        }
+        // HDD info register
+        if (address == 0xF004B008) {
+            return this.numsectors & 0x1FFFFFFF;
+        }
+        // HDD controller control/status register
+        if (address == 0xF004B00C) {
+            return 0;
+        }
+        // HDD data buffer
+        if (address >= 0xF004B010 && address < 0xF004B210) {
+            let offset = address - 0xF004B010;
+            offset -= offset % 4; // align
+            return this.databuf[offset] | (this.databuf[offset + 1] << 8) | (this.databuf[offset + 2] << 16) | (this.databuf[offset + 3] << 24);
+        }
+        return null;
+    }
+
+    writeMMIO(address, data) {
+        // HDD control/status register
+        if (address == 0xF004B004) {
+            let new_cmd = data & 0b11;
+            if (new_cmd > 3) {
+                new_cmd = 0;
+            }
+            const new_sector_idx = (data >> 3) & 0x1FFFFFFF;
+            this.command = new_cmd;
+            this.finished = false;
+            this.sector_idx = new_sector_idx;
+            
+            const boffs = this.sector_idx * 512;
+            switch (this.command) {
+            case 1:
+                this.databuf.set(this.dataArray.subarray(boffs, boffs + 512), 0);
+                break;
+            case 2:
+                this.dataArray.set(this.databuf, boffs);
+                break;
+            }
+            this.finished = true;
+        }
+        // HDD data buffer
+        if (address >= 0xF004B010 && address < 0xF004B210) {
+            let offset = address - 0xF004B010;
+            offset -= offset % 4; // align
+            if (this.command == 0 || this.finished) {
+                databuf[offset] = data & 0xFF;
+                databuf[offset + 1] = (data >> 8) & 0xFF;
+                databuf[offset + 2] = (data >> 16) & 0xFF;
+                databuf[offset + 3] = (data >> 24) & 0xFF;
+            }
+        }
+    }
+}
+
 class funnyarchComputer {
-    constructor(romArray, ramArray, serialOut = null, screenCanvas = null) {
+    constructor(romArray, ramArray, serialOut = null, screenCanvas = null, hddDataArray = null) {
         if (!(romArray instanceof Uint8Array)) {
             throw new Error("Invalid romArray type");
         }
@@ -27,6 +105,8 @@ class funnyarchComputer {
         this.serialInBuf = [];
 
         this.cpu = new funnyarchCPU(this.#readMem.bind(this), this.#writeMem.bind(this));
+
+        this.hdd = new funnyarchHDD(hddDataArray ? hddDataArray : new Uint8Array(512));
     }
 
     run(ninstrs) {
@@ -44,12 +124,18 @@ class funnyarchComputer {
     }
 
     #readMem(address) {
+        // Serial data register
         if (address == 0xF004B000) {
             if (this.serialInBuf.length == 0) {
                 return 0;
             }
             return (1 << 9) | this.serialInBuf.shift().charCodeAt(0);
         }
+        const hddmmio = this.hdd.readMMIO(address);
+        if (hddmmio !== null) {
+            return hddmmio;
+        }
+
         for (let i = 0; i < this.memoryArrays.length; i++) {
             let marr = this.memoryArrays[i];
             if (address >= marr.baseAddr && ((address - marr.baseAddr) + 3) <= marr.arr.length) {
@@ -65,6 +151,7 @@ class funnyarchComputer {
                 this.serialOut(String.fromCharCode(data & 0xFF));
             }
         }
+        this.hdd.writeMMIO(address, data);
         for (let i = 0; i < this.memoryArrays.length; i++) {
             let marr = this.memoryArrays[i];
             if (marr.readonly) {
