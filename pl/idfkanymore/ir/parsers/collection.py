@@ -116,7 +116,7 @@ def parse_while(ctx, node, bubble):
 
 @irgen.reg_ast_node_parser((ast_mod.If,), end_only=True)
 def parse_if(ctx, node, bubble):
-    def _gen_simple_if(cond, body, lbl_else):
+    def _gen_simple_if(cond, body, lbl_else, lbl_after_then):
         ret = []
 
         if cond is not None:
@@ -128,6 +128,9 @@ def parse_if(ctx, node, bubble):
 
         for n in body:
             ret += bubble(n)
+        
+        if lbl_after_then is not None:
+            ret.append(ir.JumpLocalLabel(lbl_after_then))
 
         return ret
 
@@ -160,10 +163,12 @@ def parse_if(ctx, node, bubble):
         if_chain[i].append(lbl_else)
 
     # generate code
-    for cond, body, lbl_self, lbl_else in if_chain:
+    for i, (cond, body, lbl_self, lbl_else) in enumerate(if_chain):
         if lbl_self is not None:
             ret.append(ir.LocalLabel(lbl_self))
-        ret += _gen_simple_if(cond, body.statements, lbl_else)
+        # everything other than last one gets a jump to end
+        lbl_after_then = lbl_if_end if  i != len(if_chain) - 1 else None
+        ret += _gen_simple_if(cond, body.statements, lbl_else, lbl_after_then)
     ret.append(ir.LocalLabel(lbl_if_end))
 
     return ret
