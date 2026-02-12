@@ -287,7 +287,7 @@ sections = {
 
 current_section = ".text"
 relocations = []
-symbols = []
+symbols = {}
 
 def set_section(name):
     global current_section
@@ -501,10 +501,10 @@ def parse_assembler_directive(str):
 
 def parse_assembler_label(match):
     label = match.group("label")
-    if any(x for x in symbols if x.symname == label):
+    if label in symbols:
         raise Exception(f"double symbol {label}")
     align_outfile(4)  # FIXME: this alignment stuff is SUPER broken!!!
-    symbols.append(objfmt.Symbol(current_section, label, len(sections[current_section].data)))
+    symbols[label] = objfmt.Symbol(current_section, len(sections[current_section].data))
     print(f'label "{label}" at {current_section}.{len(sections[current_section].data)}')
 
 
@@ -542,54 +542,32 @@ def genregex():
         print(f"{key}|", end="")
     print(f"{list(regmap.keys())[-1]}")
 
+if __name__ == "__main__":
+    genregex()
 
-genregex()
-
-if len(sys.argv) != 3:
-    print(f"usage: {sys.argv[0]} input output")
-    exit(1)
-
-with open(sys.argv[1]) as infile:
-    try:
-        infilec = preprocessor.preprocess(
-            infile.read(), os.path.dirname(os.path.realpath(sys.argv[1]))
-        )
-    except Exception as e:
-        print(f"preprocessor error: {e}")
+    if len(sys.argv) != 3:
+        print(f"usage: {sys.argv[0]} input output")
         exit(1)
 
-for line in infilec.splitlines():
-    if len(line) == 0:
-        continue
-    try:
-        pos = len(sections[current_section].data)
-        assembleinstr(line)
-        print(f"<0x{pos:x}> {line}")
-    except Exception as e:
-        print(f'error: {e}\nline: "{line}"')
-        exit(1)
+    with open(sys.argv[1]) as infile:
+        try:
+            infilec = preprocessor.preprocess(
+                infile.read(), os.path.dirname(os.path.realpath(sys.argv[1]))
+            )
+        except Exception as e:
+            print(f"preprocessor error: {e}")
+            exit(1)
 
-outfile = open(sys.argv[2], "w+b")
+    for line in infilec.splitlines():
+        if len(line) == 0:
+            continue
+        try:
+            pos = len(sections[current_section].data)
+            assembleinstr(line)
+            print(f"<0x{pos:x}> {line}")
+        except Exception as e:
+            print(f'error: {e}\nline: "{line}"')
+            exit(1)
 
-try:
-    ld = linker.Linker(
-        {
-            "start": 0,
-            "sections": [
-                {"name": ".entry"},
-                {"name": ".text"},
-                {"name": ".rodata"},
-                {"name": ".data"},
-            ],
-        },
-        sections,
-        symbols,
-        relocations,
-    )
-    ld.link()
-    ld.dump_all(outfile)
-except Exception as e:
-    print(f"error linking: {e}")
-    exit(1)
-
-outfile.close()
+    with open(sys.argv[2], "w+b") as f:
+        objfmt.to_obj_file(sections, symbols, relocations, f)
