@@ -4,7 +4,7 @@ class Linker:
         self.sections = sections
         self.symbols = symbols
         self.relocations = relocations
-    
+
     def link(self):
         self._relocate()
 
@@ -13,14 +13,14 @@ class Linker:
             self.dump_section(sec["name"], outfile)
     
     def dump_section(self, section, outfile):
-        outfile.write(self.sections[section]["data"])
+        outfile.write(self.sections[section].data)
 
     def _get_section_offset(self, secname):
         current = self.ld_def["start"]
         for sec in self.ld_def["sections"]:
             if sec["name"] == secname:
                 return current
-            current += len(self.sections[sec["name"]]["data"])
+            current += len(self.sections[sec["name"]].data)
         raise Exception(f"could not find offset for section {section}") 
 
     def _find_sym(self, symname):
@@ -31,10 +31,10 @@ class Linker:
     
     def _write_uint_section(self, secname, offset, bytes_, num):
         num &= (1 << (bytes_ * 8)) - 1
-        self.sections[secname]["data"][offset:offset + bytes_] = num.to_bytes(bytes_, "little")
+        self.sections[secname].data[offset:offset + bytes_] = num.to_bytes(bytes_, "little")
 
     def _read_uint_section(self, secname, offset, bytes_):
-        return int.from_bytes(self.sections[secname]["data"][offset:offset + bytes_], "little", signed=False)
+        return int.from_bytes(self.sections[secname].data[offset:offset + bytes_], "little", signed=False)
 
     def _relocate(self):
         for reloc in self.relocations:

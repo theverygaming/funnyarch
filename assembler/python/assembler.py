@@ -4,6 +4,7 @@ import sys
 from enum import Enum
 import preprocessor
 import linker
+import objfmt
 
 
 class InstructionType(Enum):
@@ -275,37 +276,13 @@ class AssembledInstr:
         self.instrspecific = instrspecific
 
 
-class Relocation:
-    def __init__(self, section, symname, valueloc, isrelative, divideval, shift_offset, bits):
-        self.section = section
-        self.symname = symname
-        self.valueloc = valueloc
-        self.isrelative = isrelative
-        self.divideval = divideval  # if symbol value should be divided by 4
-        self.shift_offset = shift_offset
-        self.bits = bits
-
-
-class Symbol:
-    def __init__(self, section, symname, location):
-        self.section = section
-        self.symname = symname
-        self.location = location
-
-
 # globals
 outfile = None
 
 sections = {
-    ".text": {
-        "data": bytearray(),
-    },
-    ".rodata": {
-        "data": bytearray(),
-    },
-    ".data": {
-        "data": bytearray(),
-    },
+    ".text": objfmt.Section(bytearray()),
+    ".rodata": objfmt.Section(bytearray()),
+    ".data": objfmt.Section(bytearray()),
 }
 
 current_section = ".text"
@@ -316,12 +293,10 @@ def set_section(name):
     global current_section
     current_section = name
     if name not in sections:
-        sections[name] = {
-            "data": bytearray(),
-        }
+        sections[name] = objfmt.Section(bytearray())
 
 def write_out_bytes(b):
-    sections[current_section]["data"] += b
+    sections[current_section].data += b
 
 
 def write_out(bytes, num):
@@ -330,7 +305,7 @@ def write_out(bytes, num):
 
 
 def align_outfile(alignment):
-    n = 4 - (len(sections[current_section]["data"]) % alignment)
+    n = 4 - (len(sections[current_section].data) % alignment)
     if n == 4:
         n = 0
     for _ in range(n):
@@ -484,10 +459,10 @@ def assemble_instr(match):
             args[i] = (0, v[1], v[2])
             shift_offset, bits = encoding_get_imm_location(instinfo.type)
             relocations.append(
-                Relocation(
+                objfmt.Relocation(
                     current_section,
                     v[0],
-                    len(sections[current_section]["data"]),
+                    len(sections[current_section].data),
                     v[1] == OperandType.rellabel or instinfo.relsymimm,
                     instinfo.divsymimm,
                     shift_offset,
@@ -529,8 +504,8 @@ def parse_assembler_label(match):
     if any(x for x in symbols if x.symname == label):
         raise Exception(f"double symbol {label}")
     align_outfile(4)  # FIXME: this alignment stuff is SUPER broken!!!
-    symbols.append(Symbol(current_section, label, len(sections[current_section]["data"])))
-    print(f'label "{label}" at {current_section}.{len(sections[current_section]["data"])}')
+    symbols.append(objfmt.Symbol(current_section, label, len(sections[current_section].data)))
+    print(f'label "{label}" at {current_section}.{len(sections[current_section].data)}')
 
 
 rg_arg = r"[A-Za-z0-9#\-_.]+"
@@ -587,7 +562,7 @@ for line in infilec.splitlines():
     if len(line) == 0:
         continue
     try:
-        pos = len(sections[current_section]["data"])
+        pos = len(sections[current_section].data)
         assembleinstr(line)
         print(f"<0x{pos:x}> {line}")
     except Exception as e:
