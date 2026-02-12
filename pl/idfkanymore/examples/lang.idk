@@ -1,8 +1,8 @@
 IMPORT "header.idkh";
 
-EXPORT VAR serial_data: POINTER TO U32 = 0xF004B000;
+EXPORT VAR ATTRIBUTE(a) ATTRIBUTE(section(testsection)) ATTRIBUTE(aaa(ident, "str", -1, 0x1234)) serial_data: POINTER TO U32 = 0xF004B000;
 
-EXPORT PROCEDURE main(): VOID;
+EXPORT PROCEDURE ATTRIBUTE(silly) main(): VOID;
 BEGIN
     print("hello world!");
 END

@@ -79,23 +79,48 @@ class TypeArray(TypeBase):
         self.member_type = member_type
 
 @dataclasses.dataclass
+class Attribute(_Ast):
+    name: str
+    args: list[str | int]
+
+    def __init__(self, name: Identifier, *args):
+        self.name = name.name
+        self.args = []
+        for arg in args:
+            if isinstance(arg, Identifier):
+                self.args.append(arg.name)
+                continue
+            self.args.append(arg)
+
+@dataclasses.dataclass
+class Attributes(_Ast):
+    attributes: list[Attribute]
+
+    def __init__(self, *args):
+        self.attributes = list(args)
+
+@dataclasses.dataclass
 class Globalvar(_Ast):
     # FIXME: visibility (export?)
+    attributes: list[Attribute]
     name: str
     type_: TypeBase
     value: Expression
 
-    def __init__(self, name: Identifier, type_: TypeBase, value: Expression):
+    def __init__(self, attributes: Attributes, name: Identifier, type_: TypeBase, value: Expression):
+        self.attributes = attributes.attributes
         self.name = name.name
         self.type_ = type_
         self.value = value
 
 @dataclasses.dataclass
 class GlobalvarDecl(_Ast):
+    attributes: list[Attribute]
     name: str
     type_: TypeBase
 
-    def __init__(self, name: Identifier, type_: TypeBase):
+    def __init__(self, attributes: Attributes, name: Identifier, type_: TypeBase):
+        self.attributes = attributes.attributes
         self.name = name.name
         self.type_ = type_
 
@@ -115,13 +140,15 @@ class ProcedurePrototypeArg(_Ast):
 
 @dataclasses.dataclass
 class ProcedurePrototype(_Ast):
+    attributes: list[Attribute]
     name: str
     args: list[ProcedurePrototypeArg]
     return_type: TypeBase
 
-    def __init__(self, *args):
-        self.name = args[0].name
-        self.args = args[1:-1]
+    def __init__(self, attributes: Attributes, name: Identifier, *args):
+        self.attributes = attributes.attributes
+        self.name = name.name
+        self.args = args[:-1]
         self.return_type = args[-1]
 
 @dataclasses.dataclass
@@ -140,17 +167,14 @@ class ProcedureDef(_Ast):
     vars_: list[ProcedureDefVar]
     block: Block
 
-    def __init__(self, *args):
-        self.prototype = args[0]
-        self.vars_ = args[1:-1]
+    def __init__(self, prototype: ProcedurePrototype, *args):
+        self.prototype = prototype
+        self.vars_ = args[:-1]
         self.block = args[-1]
 
 @dataclasses.dataclass
 class ProcedureDecl(_Ast):
     prototype: ProcedurePrototype
-
-    def __init__(self, *args):
-        self.prototype = args[0]
 
 @dataclasses.dataclass
 class PointerIndex(Expression):

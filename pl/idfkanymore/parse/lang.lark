@@ -3,9 +3,9 @@ start_header: (import_stmt | globalvar_decl | procedure_decl)*
 
 // core language
 
-globalvar: _EXPORT? _VAR variable _COLON type _EQUALS (expression | array_def) _SEMICOLON
+globalvar: _EXPORT? _VAR attributes variable _COLON type _EQUALS (expression | array_def) _SEMICOLON
 
-globalvar_decl: _EXTERN _VAR variable _COLON type _SEMICOLON
+globalvar_decl: _EXTERN _VAR attributes variable _COLON type _SEMICOLON
 
 import_stmt: _IMPORT ESCAPED_STRING _SEMICOLON
 
@@ -13,7 +13,7 @@ procedure_decl: _EXTERN procedure_prototype
 
 procedure_def: _EXPORT? procedure_prototype (_VARS procedure_def_var*)? _BEGIN block _END
 
-procedure_prototype: _PROCEDURE IDENTIFIER _LPAREN (procedure_prototype_arg (_COMMA procedure_prototype_arg)*)? _RPAREN _COLON type _SEMICOLON
+procedure_prototype: _PROCEDURE attributes IDENTIFIER _LPAREN (procedure_prototype_arg (_COMMA procedure_prototype_arg)*)? _RPAREN _COLON type _SEMICOLON
 procedure_prototype_arg: IDENTIFIER _COLON type
 
 procedure_def_var: IDENTIFIER _COLON type _SEMICOLON
@@ -96,6 +96,9 @@ if: _IF expression _THEN block (_ELSIF expression _THEN block)* (_ELSE block)? _
 
 block: statement*
 
+attributes: attribute*
+attribute: _ATTRIBUTE _LPAREN IDENTIFIER (_LPAREN (IDENTIFIER | ESCAPED_STRING | HEX_NUMBER | SIGNED_INT) (_COMMA (IDENTIFIER | ESCAPED_STRING | HEX_NUMBER | SIGNED_INT))* _RPAREN)? _RPAREN
+
 // keywords and terms and stuff
 
 // keywords
@@ -119,6 +122,7 @@ _POINTER: "POINTER"
 _TO: "TO"
 _ARRAY: "ARRAY"
 _OF: "OF"
+_ATTRIBUTE: "ATTRIBUTE"
 
 // simple terms
 _SEMICOLON: ";"
