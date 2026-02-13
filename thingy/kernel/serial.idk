@@ -17,3 +17,14 @@ EXPORT PROCEDURE serial_putc(c: U8): VOID;
 BEGIN
     serial_data[0] = c;
 END
+
+EXPORT PROCEDURE serial_getc(): U8;
+VARS
+    tmp: U32;
+BEGIN
+    tmp = serial_data[0];
+    IF (tmp >> 8) & 0x1 THEN
+        RETURN tmp & 0xFF;
+    END
+    RETURN 0;
+END

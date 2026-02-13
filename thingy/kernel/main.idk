@@ -1,8 +1,14 @@
 IMPORT "serial.idkh";
 
 EXPORT PROCEDURE kmain(): VOID;
+VARS
+    c: U8;
 BEGIN
     serial_puts("hello world!\n");
     WHILE 1 DO
+        c = serial_getc();
+        IF c != 0 THEN
+            serial_putc(c);
+        END
     DONE
 END
