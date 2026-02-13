@@ -24,6 +24,7 @@ class BackendFunnyarch(backends.Backend):
         for inst in irl:
             write_l(f"// IR: {inst}")
             if isinstance(inst, ir.GlobalVarDef):
+                write_l(f".section .data")
                 write_l(f"{inst.name}:")
                 if isinstance(inst.type_, ir.DatatypeSimpleInteger):
                     i_bytes = self._get_type_bytes(inst.type_)
@@ -39,6 +40,7 @@ class BackendFunnyarch(backends.Backend):
                             write_l(f".byte 0x{b:x}")
                 else:
                     raise Exception(f"encountered unknown datatype {inst.type_}")
+                write_l(f".section .text")
             elif isinstance(inst, ir.Function):
                 asm += self._gen_assembly_fn(inst)
                 asm += "\n\n"
