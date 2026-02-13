@@ -10,7 +10,7 @@ static std::pair<uint32_t, bool> serial_read_callback(uint32_t addr) {
         char c;
         int n = read(STDIN_FILENO, &c, 1);
         if (n == 1) {
-            return {(uint32_t)c | (1 << 9), true};
+            return {(uint32_t)c | (1 << 8), true};
         }
         return {0, true};
     }

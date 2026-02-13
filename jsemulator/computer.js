@@ -129,7 +129,7 @@ class funnyarchComputer {
             if (this.serialInBuf.length == 0) {
                 return 0;
             }
-            return (1 << 9) | this.serialInBuf.shift().charCodeAt(0);
+            return (1 << 8) | this.serialInBuf.shift().charCodeAt(0);
         }
         const hddmmio = this.hdd.readMMIO(address);
         if (hddmmio !== null) {
