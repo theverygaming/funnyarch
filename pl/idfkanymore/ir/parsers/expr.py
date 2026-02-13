@@ -63,7 +63,59 @@ def read_variable(ctx, name, dst_vreg_id: int | None = None):
                 [ir.EndUseRegs([reg_val_dst])] if dst_vreg_id is None else [],
             )
         case _:
-            raise Exception(f"unknown variable type {var_found['type']}")
+            raise Exception(f"read_variable: unsupported variable type {var_found['type']}")
+
+
+def write_variable_ref(ctx, name):
+    """
+    set a variable value. When possible will be done without an extra copy operation
+
+    return: (function(call before set): returns ircode and vreg ID to write, function (call after set): returns ircode)
+    """
+    var_found = find_variable(ctx, name)
+    match var_found["type"]:
+        case "var":
+            def fn1():
+                return ([], var_found["val"]["regid"])
+            def fn2():
+                return []
+            return (fn1, fn2)
+        case "global":
+            val_vreg = ctx.alloc_vreg(var_found["val"]["type"])
+            tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
+            tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+            def fn1():
+                return ([ir.StartUseRegs([val_vreg])], val_vreg)
+            def fn2():
+                return [
+                    ir.StartUseRegs([tmp_vreg_ptr]),
+                    ir.GetGlobalPtr(tmp_vreg_ptr, name),
+                    ir.StartUseRegs([tmp_vreg_idx]),
+                    ir.SetRegImm(tmp_vreg_idx, 0),
+                    ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, val_vreg, var_found["val"]["type"]),
+                    ir.EndUseRegs([val_vreg, tmp_vreg_ptr, tmp_vreg_idx]),
+                ]
+            return (fn1, fn2)
+        case _:
+            raise Exception(f"write_variable: unsupported variable type {var_found['type']}")
+
+
+def write_variable(ctx, name, src_vreg: int):
+    """
+    set a variable value to the value of a register.
+
+    return: ircode
+    """
+    fn1, fn2 = write_variable_ref(ctx, name)
+
+    out = []
+
+    ircode, vreg_id = fn1()
+    out += ircode
+    out.append(ir.CopyReg(src_vreg, vreg_id))
+    out += fn2()
+
+    return out
 
 
 def eval_expr(ctx, expr, dest_vreg_id):

@@ -9,69 +9,27 @@ def parse_assignment(ctx, node, bubble):
     ret = []
     if isinstance(node.to, ast_mod.Variable):
         var_name = node.to.name
-        var_found = expr.find_variable(ctx, var_name)
-        dst = var_found["val"]
-        irlib.assertion(var_found["type"] in ["var", "global"], "can only assign to variables")
-        is_local = var_found["type"] == "var"
-
-        if is_local:
-            val_vreg = dst["regid"]
-        else:
-            val_vreg = ctx.alloc_vreg(dst["type"])
-            ret.append(ir.StartUseRegs([val_vreg]))
-
-        ret += expr.eval_expr(ctx, node.value, val_vreg)
-
-        if not is_local:
-            tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
-            tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
-            ret += [
-                ir.StartUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
-                ir.GetGlobalPtr(tmp_vreg_ptr, var_name),
-                ir.SetRegImm(tmp_vreg_idx, 0),
-                ir.SetPtrReg(tmp_vreg_ptr, tmp_vreg_idx, val_vreg, dst["type"]),
-                ir.EndUseRegs([val_vreg, tmp_vreg_ptr, tmp_vreg_idx]),
-            ]
+        fn1, fn2 = expr.write_variable_ref(ctx, var_name)
+        ircode, vreg_id = fn1()
+        ret += ircode
+        ret += expr.eval_expr(ctx, node.value, vreg_id)
+        ret += fn2()
     elif isinstance(node.to, ast_mod.PointerIndex):
-        var_name = node.to.var
-        var_found = expr.find_variable(ctx, var_name)
-        dst = var_found["val"]
+        readvar_code, ptr_vreg, code_vregs_dealloc = expr.read_variable(ctx, node.to.var)
 
-        val_vreg = ctx.alloc_vreg(dst["type"].to)
+        val_vreg = ctx.alloc_vreg(ctx.proc_regs[ptr_vreg].to)
         ret.append(ir.StartUseRegs([val_vreg]))
         ret += expr.eval_expr(ctx, node.value, val_vreg)
         idx_vreg = ctx.alloc_vreg(ctx.datatypes["USIZE"])
         ret.append(ir.StartUseRegs([idx_vreg]))
         ret += expr.eval_expr(ctx, node.to.index_exp, idx_vreg)
 
-        match var_found["type"]:
-            case "var":
-                ptr_vreg = dst["regid"]
-            case "arg":
-                ptr_vreg = ctx.alloc_vreg(dst["type"])
-                ret.append(ir.StartUseRegs([ptr_vreg]))
-                ret.append(ir.GetArgVal(ptr_vreg, var_name))
-            case "global":
-                ptr_vreg = ctx.alloc_vreg(dst["type"])
-                gbl_ptr_vreg = ctx.alloc_vreg(ir.DatatypePointer(dst["type"]))
-                tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
-                ret += [
-                    ir.StartUseRegs([gbl_ptr_vreg, tmp_vreg_idx]),
-                    ir.GetGlobalPtr(gbl_ptr_vreg, var_name),
-                    ir.SetRegImm(tmp_vreg_idx, 0),
-                    ir.StartUseRegs([ptr_vreg]),
-                    ir.GetPtrReg(ptr_vreg, gbl_ptr_vreg, tmp_vreg_idx, ctx.proc_regs[gbl_ptr_vreg].to),
-                    ir.EndUseRegs([gbl_ptr_vreg, tmp_vreg_idx]),
-                ]
-            case _:
-                raise Exception(f"pointer index assignment: unsupported var type {var_found['type']}")
+        ret += readvar_code
+
         ret.append(ir.SetPtrReg(ptr_vreg, idx_vreg, val_vreg, ctx.proc_regs[ptr_vreg].to))
         ret.append(ir.EndUseRegs([val_vreg, idx_vreg]))
-        match var_found["type"]:
-            case "arg":
-                ret.append(ir.EndUseRegs([ptr_vreg]))
-            case "global":
-                ret.append(ir.EndUseRegs([ptr_vreg]))
+
+        ret += code_vregs_dealloc
     else:
         raise Exception("qwhar??")
     return ret
