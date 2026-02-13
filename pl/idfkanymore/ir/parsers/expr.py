@@ -19,6 +19,53 @@ def find_variable(ctx, name):
         }
     irlib.assertion(False, f"variable with name {name} not found")
 
+
+def read_variable(ctx, name, dst_vreg_id: int | None = None):
+    """
+    read a variable into a register, if dst_vreg_id is not set, a register to be referenced will be returned (setting that register may be UB!).
+
+    when you set dst_vreg_id you may ignore the returned value register and cleanup ircode, nothing will ever be allocated if you provide a vreg id
+
+    return:
+    (ircode, value register, cleanup ircode)
+    """
+    var_found = find_variable(ctx, name)
+    match var_found["type"]:
+        case "var":
+            if dst_vreg_id is None:
+                return ([], var_found["val"]["regid"], [])
+            return ([ir.CopyReg(var_found["val"]["regid"], dst_vreg_id)], None, [])
+        case "arg":
+            if dst_vreg_id is None:
+                tmp_vreg = ctx.alloc_vreg(var_found["val"]["type"])
+                return ([ir.StartUseRegs([tmp_vreg]), ir.GetArgVal(tmp_vreg, name)], tmp_vreg, [ir.EndUseRegs([tmp_vreg])])
+            return ([ir.GetArgVal(dst_vreg_id, name)], None, [])
+        case "global":
+            if dst_vreg_id is None:
+                reg_val_dst = ctx.alloc_vreg(var_found["val"]["type"])
+            else:
+                reg_val_dst = dst_vreg_id
+            tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
+            tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
+            return (
+                [
+                    ir.StartUseRegs([tmp_vreg_ptr]),
+                    ir.GetGlobalPtr(tmp_vreg_ptr, name),
+                    ir.StartUseRegs([tmp_vreg_idx]),
+                    ir.SetRegImm(tmp_vreg_idx, 0),
+                ]
+                + ([ir.StartUseRegs([reg_val_dst])] if dst_vreg_id is None else [])
+                + [
+                    ir.GetPtrReg(reg_val_dst, tmp_vreg_ptr, tmp_vreg_idx, var_found["val"]["type"]),
+                    ir.EndUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
+                ],
+                reg_val_dst if dst_vreg_id is None else None,
+                [ir.EndUseRegs([reg_val_dst])] if dst_vreg_id is None else [],
+            )
+        case _:
+            raise Exception(f"unknown variable type {var_found['type']}")
+
+
 def eval_expr(ctx, expr, dest_vreg_id):
     if isinstance(expr, ast_mod.Constant):
         if isinstance(expr.value, int):
@@ -34,22 +81,8 @@ def eval_expr(ctx, expr, dest_vreg_id):
                 }
             return [ir.GetGlobalPtr(dest_vreg_id, varname)]
     elif isinstance(expr, ast_mod.Variable):
-        var_found = find_variable(ctx, expr.name)
-        match var_found["type"]:
-            case "var":
-                return [ir.CopyReg(var_found["val"]["regid"], dest_vreg_id)]
-            case "arg":
-                return [ir.GetArgVal(dest_vreg_id, expr.name)]
-            case "global":
-                tmp_vreg_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
-                tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
-                return [
-                    ir.StartUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
-                    ir.GetGlobalPtr(tmp_vreg_ptr, expr.name),
-                    ir.SetRegImm(tmp_vreg_idx, 0),
-                    ir.GetPtrReg(dest_vreg_id, tmp_vreg_ptr, tmp_vreg_idx, var_found["val"]["type"]),
-                    ir.EndUseRegs([tmp_vreg_ptr, tmp_vreg_idx]),
-                ]
+        out, _, _ = read_variable(ctx, expr.name, dest_vreg_id)
+        return out
     elif isinstance(expr, ast_mod.Binop):
         tmp_vreg_lhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
         tmp_vreg_rhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
@@ -68,38 +101,16 @@ def eval_expr(ctx, expr, dest_vreg_id):
     elif isinstance(expr, ast_mod.PointerIndex):
         ret = []
 
-        var_found = find_variable(ctx, expr.var)
-        match var_found["type"]:
-            case "var":
-                vreg_ptr = var_found["val"]["regid"]
-            case "arg":
-                vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
-                ret.append(ir.StartUseRegs([vreg_ptr]))
-                ret.append(ir.GetArgVal(vreg_ptr, expr.var))
-            case "global":
-                tmp_vreg_global_ptr = ctx.alloc_vreg(ir.DatatypePointer(var_found["val"]["type"]))
-                tmp_vreg_idx_global = ctx.alloc_vreg(ctx.datatypes["USIZE"])
-                vreg_ptr = ctx.alloc_vreg(var_found["val"]["type"])
-                ret += [
-                    ir.StartUseRegs([tmp_vreg_global_ptr]),
-                    ir.GetGlobalPtr(tmp_vreg_global_ptr, expr.var),
-                    ir.StartUseRegs([vreg_ptr]),
-                    ir.StartUseRegs([tmp_vreg_idx_global]),
-                    ir.SetRegImm(tmp_vreg_idx_global, 0),
-                    ir.GetPtrReg(vreg_ptr, tmp_vreg_global_ptr, tmp_vreg_idx_global, ctx.proc_regs[tmp_vreg_global_ptr]),
-                    ir.EndUseRegs([tmp_vreg_global_ptr, tmp_vreg_idx_global]),
-                ]
+        readvar_code, vreg_ptr, code_vregs_dealloc = read_variable(ctx, expr.var)
+        ret += readvar_code
 
         tmp_vreg_idx = ctx.alloc_vreg(ctx.datatypes["USIZE"])
         ret.append(ir.StartUseRegs([tmp_vreg_idx]))
         ret += eval_expr(ctx, expr.index_exp, tmp_vreg_idx)
         ret.append(ir.GetPtrReg(dest_vreg_id, vreg_ptr, tmp_vreg_idx, ctx.proc_regs[vreg_ptr].to))
         ret.append(ir.EndUseRegs([tmp_vreg_idx]))
-        match var_found["type"]:
-            case "arg":
-                ret.append(ir.EndUseRegs([vreg_ptr]))
-            case "global":
-                ret.append(ir.EndUseRegs([vreg_ptr]))
+
+        ret += code_vregs_dealloc
         return ret
     elif isinstance(expr, ast_mod.Comparison):
         tmp_vreg_lhs = ctx.alloc_vreg(ctx.proc_regs[dest_vreg_id])
