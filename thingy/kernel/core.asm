@@ -69,6 +69,11 @@ mov r0, #1
 mov r1, #69 // 'E'
 int #128
 
+// debug print
+mov r0, #1
+mov r1, #10 // '\n'
+int #128
+
 rjal kmain
 // jump to ROM start, hopefully resetting the machine
 jmp #0
