@@ -4,6 +4,8 @@ import lark
 import lark.tree
 import lark.ast_utils
 import enum
+import codecs
+
 
 class ComparisonOperatorType(enum.Enum):
     LT = "<"
@@ -278,9 +280,14 @@ class ToAst(lark.Transformer):
     # Define extra transformation functions, for rules that don't correspond to an AST class.
 
     def ESCAPED_STRING(self, s):
-        # Remove quotation marks
-        # FIXME: escape chars?
-        return s[1:-1]
+        # Remove quotation marks, decode escape sequences
+        return codecs.escape_decode(s[1:-1].encode("utf-8"))[0].decode("utf-8")
+
+    def CHAR_LITERAL(self, s):
+        cs = self.ESCAPED_STRING(s).encode("utf-8")
+        if len(cs) != 1:
+            raise Exception(f"char literal must have a length of 1, got {len(cs)} (bytes: '{cs}')")
+        return cs[0]
 
     def SIGNED_INT(self, n):
         return int(n)

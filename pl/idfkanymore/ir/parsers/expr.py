@@ -28,7 +28,7 @@ def eval_expr(ctx, expr, dest_vreg_id):
             if varname not in ctx.globalvars:
                 ctx.globalvars[varname] = {
                     "type": ir.DatatypeArray(ctx.datatypes["U8"], len(expr.value) + 1),
-                    "value": [ord(c) for c in expr.value] + [0],
+                    "value": [b for b in expr.value.encode("utf-8")] + [0],
                     "def": True,
                     "attributes": {},
                 }
