@@ -1,0 +1,2 @@
+EXTERN PROCEDURE serial_puts(str: POINTER TO U8): VOID;
+EXTERN PROCEDURE serial_putc(c: U8): VOID;

@@ -17,7 +17,8 @@ sub rsp, rsp, #4 // rsp = top of memory
 push(r0)
 push(r1)
 
-mov r2, #0b1 // set alignment flag
+//mov r2, #0b1 // set alignment flag
+mov r2, #0 // no alignment needed
 mtsr pcst, r2
 
 // read as many sectors of HDD as we can! only the first sector isn't enough

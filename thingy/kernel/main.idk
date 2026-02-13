@@ -1,5 +1,8 @@
+IMPORT "serial.idkh";
+
 EXPORT PROCEDURE kmain(): VOID;
 BEGIN
+    serial_puts("hello world!");
     WHILE 1 DO
     DONE
 END

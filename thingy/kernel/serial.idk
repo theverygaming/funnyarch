@@ -1,0 +1,19 @@
+IMPORT "serial.idkh";
+
+VAR serial_data: POINTER TO U32 = 0xF004B000;
+
+EXPORT PROCEDURE serial_puts(str: POINTER TO U8): VOID;
+VARS
+    len: USIZE;
+BEGIN
+    len = 0;
+    WHILE str[len] DO
+        serial_putc(str[len]);
+        len = len + 1;
+    DONE
+END
+
+EXPORT PROCEDURE serial_putc(c: U8): VOID;
+BEGIN
+    serial_data[0] = c;
+END
