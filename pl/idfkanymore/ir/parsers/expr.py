@@ -4,7 +4,7 @@ from .. import lib as irlib
 from .. import irgen as irgen
 from . import procedure
 
-def find_variable(ctx, name):
+def _find_variable(ctx, name):
     val = ctx.proc_locals.get(name, None)
     if val is not None:
         return {
@@ -29,7 +29,7 @@ def read_variable(ctx, name, dst_vreg_id: int | None = None):
     return:
     (ircode, value register, cleanup ircode)
     """
-    var_found = find_variable(ctx, name)
+    var_found = _find_variable(ctx, name)
     match var_found["type"]:
         case "var":
             if dst_vreg_id is None:
@@ -72,7 +72,7 @@ def write_variable_ref(ctx, name):
 
     return: (function(call before set): returns ircode and vreg ID to write, function (call after set): returns ircode)
     """
-    var_found = find_variable(ctx, name)
+    var_found = _find_variable(ctx, name)
     match var_found["type"]:
         case "var":
             def fn1():
