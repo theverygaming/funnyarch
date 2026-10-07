@@ -287,6 +287,7 @@ sections = {
     ".data": objfmt.Section(bytearray()),
 }
 
+last_full_label = None
 current_section = ".text"
 relocations = []
 symbols = {}
@@ -466,12 +467,17 @@ def assemble_instr(match):
     # if we have a label create a relocation at this point
     for i, v in enumerate(args):
         if v[1].islabel():
+            label = v[0]
+            if label.startswith("."):
+                if last_full_label is None:
+                    raise Exception(f"dot-prefixed (local) label '{label}' used without defining a normal label beforehand")
+                label = last_full_label + label
             args[i] = (0, v[1], v[2])
             shift_offset, bits = encoding_get_imm_location(instinfo.type)
             relocations.append(
                 objfmt.Relocation(
                     current_section,
-                    v[0],
+                    label,
                     len(sections[current_section].data),
                     v[1] == OperandType.rellabel or instinfo.relsymimm,
                     v[1] == OperandType.lowlabel,
@@ -512,7 +518,14 @@ def parse_assembler_directive(str):
 
 
 def parse_assembler_label(match):
+    global last_full_label
     label = match.group("label")
+    if label.startswith("."):
+        if last_full_label is None:
+            raise Exception(f"dot-prefixed (local) label '{label}' defined without defining a normal label beforehand")
+        label = last_full_label + label
+    else:
+        last_full_label = label
     if label in symbols:
         raise Exception(f"double symbol {label}")
     align_outfile(4)  # FIXME: this alignment stuff is SUPER broken!!!
