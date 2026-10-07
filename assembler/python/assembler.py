@@ -508,6 +508,10 @@ def parse_assembler_directive(str):
             write_out(1, 0)  # null terminator
     elif split[0] == ".byte":
         write_out(1, int(split[1], 0))
+    elif split[0] == ".halfword":
+        write_out(2, int(split[1], 0))
+    elif split[0] == ".word":
+        write_out(4, int(split[1], 0))
     elif split[0] == ".align":
         align_outfile(int(split[1], 0))
     elif split[0] == ".regalias":
@@ -538,7 +542,7 @@ def parse_assembler_label(match):
 rg_arg = r"[A-Za-z0-9#\-_.]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
-rg_directive = r"^\.(export|extern|string|ascii|byte|section|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"
+rg_directive = r"^\.(export|extern|string|ascii|byte|halfword|word|section|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 
 
