@@ -303,7 +303,9 @@ def write_out_bytes(b):
 
 
 def write_out(bytes, num):
-    num &= (1 << (bytes * 8)) - 1
+    mask = (1 << (bytes * 8)) - 1
+    if num & ~mask:
+        raise Exception(f"asked to write {bytes}-byte number but got 0x{num:x} which doesn't fit!")
     write_out_bytes(num.to_bytes(bytes, "little"))
 
 
