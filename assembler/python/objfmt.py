@@ -17,6 +17,8 @@ class Relocation(DictSerializable):
     symname: str
     valueloc: int
     isrelative: bool
+    islowpart: bool
+    ishighpart: bool
     divideval: bool # if symbol value should be divided by 4
     shift_offset: int
     bits: int

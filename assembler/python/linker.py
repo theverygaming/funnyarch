@@ -90,6 +90,10 @@ class Linker:
             relocval = 0
             if reloc.isrelative:
                 relocval = symloc - (reloc_valueloc + 4)
+            elif reloc.islowpart:
+                relocval = symloc & 0xFFFF
+            elif reloc.ishighpart:
+                relocval = symloc >> 16
             else:
                 relocval = symloc
             if reloc.divideval:

@@ -24,6 +24,8 @@ class OperandType(Enum):
     imm23 = 4
     label = 5
     rellabel = 6
+    lowlabel = 7
+    highlabel = 8
 
     def isimm(self):
         return (
@@ -34,7 +36,7 @@ class OperandType(Enum):
     def islabel(self):
         return (
             self.value >= OperandType.label.value
-            and self.value <= OperandType.rellabel.value
+            and self.value <= OperandType.highlabel.value
         )
 
     def immfits(self, imm):
@@ -317,6 +319,8 @@ def get_operand_type(opstr):
         isreg = False
         islabel = False
         isrellabel = False
+        islowlabel = False
+        ishighlabel = False
         if str in regmap:
             isreg = True
             rval = regmap[str]
@@ -326,19 +330,25 @@ def get_operand_type(opstr):
         elif str[0] == "#":
             rval = int(str[1:], 0)
         else:
-            rval = re.sub(".rel$", "", str)
-            islabel = not str.endswith(".rel")
+            rval = re.sub(r"(?:\.rel|\.low|\.high)$", "", str)
             isrellabel = str.endswith(".rel")
-        return isreg, islabel, isrellabel, rval
+            islowlabel = str.endswith(".low")
+            ishighlabel = str.endswith(".high")
+            islabel = not (isrellabel or islowlabel or ishighlabel)
+        return isreg, islabel, isrellabel, islowlabel, ishighlabel, rval
 
     if len(opstr) == 0:
         raise Exception(f"invalid: {opstr}")
 
-    isreg, islabel, isrellabel, val = parseop(opstr)
+    isreg, islabel, isrellabel, islowlabel, ishighlabel, val = parseop(opstr)
     if isreg:
         optype = OperandType.register
     elif isrellabel:
         optype = OperandType.rellabel
+    elif islowlabel:
+        optype = OperandType.lowlabel
+    elif ishighlabel:
+        optype = OperandType.highlabel
     elif islabel:
         optype = OperandType.label
     else:
@@ -464,6 +474,8 @@ def assemble_instr(match):
                     v[0],
                     len(sections[current_section].data),
                     v[1] == OperandType.rellabel or instinfo.relsymimm,
+                    v[1] == OperandType.lowlabel,
+                    v[1] == OperandType.highlabel,
                     instinfo.divsymimm,
                     shift_offset,
                     bits,
