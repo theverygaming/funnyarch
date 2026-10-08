@@ -109,7 +109,6 @@ public:
         imgui_end_render();
 #endif
         SDL_RenderPresent(sdl_renderer);
-        SDL_GL_SwapWindow(sdl_window);
     }
 
     void wait_frame_start() {
