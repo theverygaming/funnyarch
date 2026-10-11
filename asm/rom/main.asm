@@ -3,7 +3,7 @@ entry:
 rjmp main
 
 #include "macros.asm"
-#include "hdd.asm"
+#include "../libs/hdd.asm"
 #include "interrupts.asm"
 
 #define REG_MEMSTART r24
