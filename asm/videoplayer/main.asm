@@ -1,7 +1,9 @@
+// FIXME: as of getting this to work with the new HDD stuff there were some artifacts in the video (remains of previous frames on new frames) and idk what the cause is. Might be my source file?? Idk. It was weird. To be investigated! 
 entry:
 rjmp main
 
 #include "macros.asm"
+#include "../libs/hdd.asm"
 
 interrupt:
 push(r0)
@@ -24,18 +26,44 @@ mtsr ibptr, r0
 mov rsp, #0x2200
 push(lr)
 
-// load instructions
-mov r20, #0x0000
-movh r20, #0xF005
+rcall(clearscreen)
+
+// load instructions from HDD
+// r21 = number of sectors on HDD left
+//rcall(hdd_getnsectors)
+//mov r21, r0
+mov r21, #10
+.main_readsector:
+mov r0, r21
+rcall(hdd_read)
+mov r20, r0
+add r21, #1
+mov r22, #0
 .main_instrloop:
-ldr r0, r20, #0
-ldr r1, r20, #0
-rcall(decodecmd) 
+ldri r0, r20, #4
+ldri r1, r20, #4
+add r22, r22, #1
+rcall(decodecmd)
+cmp r22, #64 // 512/(2*4) = 64
+ifeq rjmp .main_readsector
 rjmp .main_instrloop
 
 pop(lr)
 rjmp entry
 
+clearscreen:
+// r0 = FB start / current address
+mov r0, #0x0000
+movh r0, #0xF000
+// r1 = FB end
+mov r1, #0x9600
+// r2 = zero reg
+mov r2, #0
+.clearscreen_loop:
+stri r0, r2, #4
+cmp r0, r1
+ifneq rjmp .clearscreen_loop
+ret
 
 // command words in r0 and r1
 decodecmd:

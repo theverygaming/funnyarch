@@ -19,3 +19,16 @@ ifneq rjmp .hdd_read_L0
 mov r0, #0xB010 // HDD data buffer
 movh r0, #0xF004 // HDD data buffer
 ret
+
+// get total number of sectors on HDD
+// returns: number of sectors in r0
+// trashes: r1
+hdd_getnsectors:
+mov r0, #0xB008 // HDD info register
+movh r0, #0xF004 // HDD info register
+ldr r0, r0, #0
+mov r1, #0x03
+shl r1, r1, #29
+not r1, r1
+and r0, r0, r1
+ret
