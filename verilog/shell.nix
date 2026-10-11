@@ -11,6 +11,6 @@ stdenv.mkDerivation {
 
     SDL2
 
-    python311
+    python313
   ];
 }

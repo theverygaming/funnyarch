@@ -2,7 +2,7 @@ with import <nixpkgs> { };
 stdenv.mkDerivation {
   name = "demo-baremetal";
   buildInputs = [
-    python311
+    python313
     gnumake
     grub2
     xorriso
