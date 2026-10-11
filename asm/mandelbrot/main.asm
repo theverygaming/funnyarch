@@ -1,6 +1,4 @@
 // reference C code (below) converted to assembly by deneb (https://github.com/DenebTM) and theverygaming
-
-.origin 0x0
 entry:
   rjmp main
 

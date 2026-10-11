@@ -1,6 +1,5 @@
 // Monitor program
 // Inspired by the Apple I Wozniak Monitor
-.origin 0x0
 entry:
 rjmp main
 

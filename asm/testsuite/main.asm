@@ -1,4 +1,3 @@
-.origin 0x0
 rjmp main
 
 #include "macros.asm"

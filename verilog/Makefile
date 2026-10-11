@@ -25,7 +25,8 @@ out/testbench_%: tests/testbench_%.cpp src/%.v
 	cp obj_dir/V$* out/testbench_$*
 
 output.bin: ../asm/testsuite/**
-	python3 ../assembler/python/assembler.py ../asm/testsuite/main.asm output.bin
+	python3 ../assembler/python/assembler.py ../asm/testsuite/main.asm output.o
+	python3 ../assembler/python/linker.py --origin 0 -o output.bin output.o
 
 emulator: src/* emu/* output.bin
 	verilator --top-module cpu -O3 --x-assign fast --x-initial fast --noassert -cc src/*.v --exe emu/*.cpp --CFLAGS "`sdl2-config --cflags`" --LDFLAGS "`sdl2-config --libs`"
