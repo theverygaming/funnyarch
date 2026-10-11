@@ -4,7 +4,9 @@ module alu (
     in2,
     output reg [31:0] out,
     output reg carry,
-    zero
+    zero,
+    sign,
+    overflow
 );
   wire signed [31:0] in1s = in1;
   wire signed [31:0] in2s = in2;
@@ -25,5 +27,12 @@ module alu (
     out   = tmp[31:0];
     carry = tmp[32];
     zero  = tmp[31:0] == 0;
+    sign  = tmp[31];
+
+    case (opcode)
+      4'h1: overflow = (in1[31] == in2[31]) && (out[31] != in1[31]);  /* add */
+      4'h2: overflow = (in1[31] != in2[31]) && (out[31] != in1[31]);  /* sub */
+      default: overflow = 0;
+    endcase
   end
 endmodule

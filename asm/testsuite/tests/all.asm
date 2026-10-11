@@ -1,4 +1,5 @@
 #include "tests/cmptest.asm"
+#include "tests/cmpstest.asm"
 #include "tests/jumptest.asm"
 #include "tests/addtest.asm"
 #include "tests/subtest.asm"
@@ -15,6 +16,7 @@
 alltests:
 push(lr)
 rcall(cmptest)
+rcall(cmpstest)
 rcall(jumptest)
 rcall(addtest)
 rcall(subtest)

@@ -383,10 +383,17 @@ begin:
     case 0x0c: { /* CMP(E7) */
         union enc_7 e;
         e.instr = instr;
-        uint32_t result;
-        bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], ctx->regs[e.str.src], &result);
-        bitset(&ctx->regs[CPU_REG_RF], 0, carry);
-        bitset(&ctx->regs[CPU_REG_RF], 1, result == 0);
+        if (e.str.instr_spe == 1) {
+            int32_t a = (int32_t)ctx->regs[e.str.tgt];
+            int32_t b = (int32_t)ctx->regs[e.str.src];
+            bitset(&ctx->regs[CPU_REG_RF], 0, a < b);
+            bitset(&ctx->regs[CPU_REG_RF], 1, a == b);
+        } else {
+            uint32_t result;
+            bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], ctx->regs[e.str.src], &result);
+            bitset(&ctx->regs[CPU_REG_RF], 0, carry);
+            bitset(&ctx->regs[CPU_REG_RF], 1, result == 0);
+        }
         clock_cycles += 4;
         break;
     }
@@ -394,10 +401,19 @@ begin:
     case 0x0d: { /* CMP(E3) */
         union enc_3<unsigned long> e;
         e.instr = instr;
-        uint32_t result;
-        bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], e.str.imm16, &result);
-        bitset(&ctx->regs[CPU_REG_RF], 0, carry);
-        bitset(&ctx->regs[CPU_REG_RF], 1, result == 0);
+        if (e.str.instr_spe == 1) {
+            union enc_3<long> es;
+            es.instr = instr;
+            int32_t a = (int32_t)ctx->regs[es.str.tgt];
+            int32_t b = es.str.imm16;
+            bitset(&ctx->regs[CPU_REG_RF], 0, a < b);
+            bitset(&ctx->regs[CPU_REG_RF], 1, a == b);
+        } else {
+            uint32_t result;
+            bool carry = __builtin_sub_overflow(ctx->regs[e.str.tgt], e.str.imm16, &result);
+            bitset(&ctx->regs[CPU_REG_RF], 0, carry);
+            bitset(&ctx->regs[CPU_REG_RF], 1, result == 0);
+        }
         clock_cycles += 4;
         break;
     }

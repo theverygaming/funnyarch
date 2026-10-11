@@ -367,7 +367,12 @@ class funnyarchCPU {
 
                 case 0x0c: { /* CMP(E7) */
                     let e = new funnyarchCPUInstrEncoding7(instr);
-                    let res = subtract_overflow(this.registers[e.str.tgt], this.registers[e.str.src]);
+                    let res = null;
+                    if (e.str.instr_spe == 1) {
+                        res = subtract_overflow(twosComplement(this.registers[e.str.tgt], 32), twosComplement(this.registers[e.str.src], 32));
+                    } else {
+                        res = subtract_overflow(this.registers[e.str.tgt], this.registers[e.str.src]);
+                    }
                     this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFE) | ((res.carry ? 1 : 0)) << 0) >>> 0;
                     this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFD) | (((res.result == 0) ? 1 : 0) << 1)) >>> 0;
                     break;
@@ -375,7 +380,12 @@ class funnyarchCPU {
 
                 case 0x0d: { /* CMP(E3) */
                     let e = new funnyarchCPUInstrEncoding3(instr);
-                    let res = subtract_overflow(this.registers[e.str.tgt], e.str.imm16);
+                    let res = null;
+                    if (e.str.instr_spe == 1) {
+                        res = subtract_overflow(twosComplement(this.registers[e.str.tgt], 32), twosComplement(e.str.imm16, 16));
+                    } else {
+                        res = subtract_overflow(this.registers[e.str.tgt], e.str.imm16);
+                    }
                     this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFE) | ((res.carry ? 1 : 0)) << 0) >>> 0;
                     this.registers[this.#REG_RF] = ((this.registers[this.#REG_RF] & 0xFFFFFFFD) | (((res.result == 0) ? 1 : 0) << 1)) >>> 0;
                     break;

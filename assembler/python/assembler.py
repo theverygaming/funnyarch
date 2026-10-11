@@ -124,6 +124,10 @@ instructions = {
         Instruction(InstructionType.E7, 0x0C),
         Instruction(InstructionType.E3, 0x0D),
     ],
+    "cmps": [
+        Instruction(InstructionType.E7, 0x0C, instrspecific=1),
+        Instruction(InstructionType.E3, 0x0D, instrspecific=1),
+    ],
     "int": [
         Instruction(InstructionType.E4, 0x0E),
     ],

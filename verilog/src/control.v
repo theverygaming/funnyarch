@@ -14,7 +14,9 @@ module control (
     output reg [31:0] alu_op2,
     input [31:0] alu_out,
     input alu_carry,
-    alu_zero
+    alu_zero,
+    alu_sign,
+    alu_overflow
 
     // definitions
     `define STATE_FETCH 3'h0
@@ -109,12 +111,14 @@ module control (
 
   always @(posedge clk) begin
     if (reset == 1) begin
+      /* verilator lint_off COVERIGN */
       //$display("CPU: reset");
       regarr[`REG_RIP] <= `INITIAL_RIP;
       regarr[`REG_RF] <= 32'b0;
       sysregarr[`SYSREG_PCST] <= 32'b0;
 
       state <= `STATE_FETCH;
+      /* verilator lint_on COVERIGN */
     end  // fetch
     else if (state == `STATE_FETCH) begin
       data_rw <= 0;
@@ -255,7 +259,7 @@ module control (
           end
           6'h0d: begin  /* CMP(E3) */
             alu_op1 <= regarr[instr[13:9]];
-            alu_op2 <= {16'b0, instr[31:16]};
+            if (instr[14] == 1) alu_op2 <= {{17{instr[31]}}, instr[30:16]}; else alu_op2 <= {16'b0, instr[31:16]};
             alu_opcode <= 4'h2;
             state <= `STATE_WRITEBACK;
           end
@@ -464,12 +468,12 @@ module control (
           state <= `STATE_FETCH;
         end
         6'h0c: begin  /* CMP(E7) */
-          regarr[`REG_RF][0] <= alu_carry;
+          if (instr[19] == 1) regarr[`REG_RF][0] <= alu_sign ^ alu_overflow; else regarr[`REG_RF][0] <= alu_carry;
           regarr[`REG_RF][1] <= alu_zero;
           state <= `STATE_FETCH;
         end
         6'h0d: begin  /* CMP(E3) */
-          regarr[`REG_RF][0] <= alu_carry;
+          if (instr[14] == 1) regarr[`REG_RF][0] <= alu_sign ^ alu_overflow; else regarr[`REG_RF][0] <= alu_carry;
           regarr[`REG_RF][1] <= alu_zero;
           state <= `STATE_FETCH;
         end
