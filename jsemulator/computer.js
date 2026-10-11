@@ -1,5 +1,7 @@
 "use strict";
 
+// FIXME: seems to hang like hell in Firefox????
+
 class funnyarchHDD {
     constructor(dataArray) {
         if (!(dataArray instanceof Uint8Array)) {
