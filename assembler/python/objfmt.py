@@ -15,6 +15,7 @@ class DictSerializable:
 class Relocation(DictSerializable):
     section: str
     symname: str
+    symoffs: int
     valueloc: int
     isrelative: bool
     islowpart: bool

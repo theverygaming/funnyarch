@@ -327,6 +327,7 @@ def get_operand_type(opstr):
         isrellabel = False
         islowlabel = False
         ishighlabel = False
+        extra = None
         if str in regmap:
             isreg = True
             rval = regmap[str]
@@ -336,17 +337,21 @@ def get_operand_type(opstr):
         elif str[0] == "#":
             rval = int(str[1:], 0)
         else:
-            rval = re.sub(r"(?:\.rel|\.low|\.high)$", "", str)
-            isrellabel = str.endswith(".rel")
-            islowlabel = str.endswith(".low")
-            ishighlabel = str.endswith(".high")
+            match = re.match(r"^(?P<name>\.?[a-zA-Z0-9_]+)(?:(?P<offsop>\+)(?P<offs>\d+))?(?P<attr>\.rel|\.low|\.high)?$", str)
+            if match is None:
+                raise Exception(f"could not match label {str}")
+            isrellabel = match.group("attr") == ".rel"
+            islowlabel = match.group("attr") == ".low"
+            ishighlabel = match.group("attr") == ".high"
+            extra = (({"+": 1, "-": -1}[match.group("offsop")]) * int(match.group("offs"))) if match.group("offs") is not None else 0
             islabel = not (isrellabel or islowlabel or ishighlabel)
-        return isreg, islabel, isrellabel, islowlabel, ishighlabel, rval
+            rval = match.group("name")
+        return isreg, islabel, isrellabel, islowlabel, ishighlabel, rval, extra
 
     if len(opstr) == 0:
         raise Exception(f"invalid: {opstr}")
 
-    isreg, islabel, isrellabel, islowlabel, ishighlabel, val = parseop(opstr)
+    isreg, islabel, isrellabel, islowlabel, ishighlabel, val, extra = parseop(opstr)
     if isreg:
         optype = OperandType.register
     elif isrellabel:
@@ -376,7 +381,7 @@ def get_operand_type(opstr):
                 optype = OperandType.imm23
             else:
                 raise Exception(f"larger than biggest possible immediate: {opstr}")
-    return val, optype
+    return val, optype, extra
 
 
 def encoding_get_imm_location(encoding):
@@ -449,8 +454,8 @@ def assemble_instr(match):
     )
 
     for i, v in enumerate(args):
-        val, opt = get_operand_type(v)
-        args[i] = (val, opt, opt)  # value, operand type, actual operand type
+        val, opt, extra = get_operand_type(v)
+        args[i] = (val, opt, opt, extra)  # value, operand type, actual operand type
 
     instinfo = None
     for inst in instructions[instr]:
@@ -459,7 +464,7 @@ def assemble_instr(match):
         invalid = False
         for i, opt in enumerate(args):
             if opt[1].islabel() and inst.operands[i].isimm():
-                args[i] = (opt[0], opt[1], inst.operands[i])
+                args[i] = (opt[0], opt[1], inst.operands[i], opt[3])
             elif not inst.operands[i].compat(opt[1]):
                 invalid = True
                 break
@@ -478,6 +483,7 @@ def assemble_instr(match):
                 objfmt.Relocation(
                     current_section,
                     v[0],
+                    v[3],
                     len(sections[current_section].data),
                     v[1] == OperandType.rellabel or instinfo.relsymimm,
                     v[1] == OperandType.lowlabel,
@@ -530,7 +536,7 @@ def parse_assembler_label(match):
     print(f'label "{label}" at {current_section}.{len(sections[current_section].data)}')
 
 
-rg_arg = r"[A-Za-z0-9#\-_.]+"
+rg_arg = r"[A-Za-z0-9#\-_.\+\-]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
 rg_directive = r"^\.(export|extern|string|ascii|byte|halfword|word|section|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"

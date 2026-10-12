@@ -84,7 +84,7 @@ class Linker:
     def _relocate(self):
         for reloc in self.relocations:
             symbol = self._find_sym(reloc.symname)
-            symloc = self._get_section_offset(symbol.section) + symbol.location
+            symloc = self._get_section_offset(symbol.section) + symbol.location + reloc.symoffs
             reloc_valueloc = self._get_section_offset(reloc.section) + reloc.valueloc
 
             relocval = 0
