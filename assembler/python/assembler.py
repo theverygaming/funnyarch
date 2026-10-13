@@ -590,8 +590,7 @@ if __name__ == "__main__":
                 infile.read(), [os.path.dirname(os.path.realpath(args.input))] + (args.includepath or [])
             )
         except Exception as e:
-            print(f"preprocessor error: {e}")
-            exit(1)
+            raise Exception("preprocessor error") from e
 
     for line in infilec.splitlines():
         if len(line) == 0:
@@ -601,8 +600,7 @@ if __name__ == "__main__":
             assembleinstr(line)
             print(f"<0x{pos:x}> {line}")
         except Exception as e:
-            print(f'error: {e}\nline: "{line}"')
-            exit(1)
+            raise Exception(f'error on line: "{line}"') from e
 
     with open(args.output, "w+b") as f:
         objfmt.to_obj_file(sections, symbols, relocations, f)
