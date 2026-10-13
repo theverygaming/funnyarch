@@ -574,14 +574,20 @@ def genregex():
 if __name__ == "__main__":
     genregex()
 
-    if len(sys.argv) != 3:
-        print(f"usage: {sys.argv[0]} input output")
-        exit(1)
+    import argparse
 
-    with open(sys.argv[1]) as infile:
+    parser = argparse.ArgumentParser(description="Weird compiler")
+    parser.add_argument(
+        "-o", "--output", metavar="output", help="output file name", required=True, type=str
+    )
+    parser.add_argument("input", metavar="input", help="input file name", type=str)
+    parser.add_argument("-I", "--includepath", metavar="includepath", help="include paths", type=str, nargs="+")
+    args = parser.parse_args()
+
+    with open(args.input) as infile:
         try:
             infilec = preprocessor.preprocess(
-                infile.read(), os.path.dirname(os.path.realpath(sys.argv[1]))
+                infile.read(), [os.path.dirname(os.path.realpath(args.input))] + (args.includepath or [])
             )
         except Exception as e:
             print(f"preprocessor error: {e}")
@@ -598,5 +604,5 @@ if __name__ == "__main__":
             print(f'error: {e}\nline: "{line}"')
             exit(1)
 
-    with open(sys.argv[2], "w+b") as f:
+    with open(args.output, "w+b") as f:
         objfmt.to_obj_file(sections, symbols, relocations, f)

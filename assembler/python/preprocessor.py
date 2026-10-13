@@ -118,24 +118,29 @@ def resolvemacros(str, macros_c):
     return mcount, str
 
 
-def resolveincludes(str, basepath):
+def resolveincludes(str, includepaths):
     includeregex = r'^#include +"(?P<fname>[^"]+)".*$'
     lines = str.splitlines()
     for i, line in enumerate(lines):
         match = re.match(includeregex, line)
         if match is not None:
-            with open(os.path.join(basepath, match.group("fname"))) as w:
-                newstr = w.read()
+            newstr = None
+            for path in includepaths:
+                with open(os.path.join(path, match.group("fname"))) as w:
+                    newstr = w.read()
+                    break
+            if newstr is None:
+                raise Exception(f"include {line} could not be resolved in {includepaths}")
             newstr = c_comment_remover(newstr)
-            newstr = resolveincludes(newstr, basepath)
+            newstr = resolveincludes(newstr, includepaths)
             lines[i] = newstr
     str = "\n".join(lines)
     return str
 
 
-def preprocess(str, basepath):
+def preprocess(str, includepaths):
     str = c_comment_remover(str)
-    str = resolveincludes(str, basepath)
+    str = resolveincludes(str, includepaths)
     macros_c = list(__builtin_macros)
     while True:
         mcount, str = resolvemacros(str, macros_c)
