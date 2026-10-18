@@ -13,22 +13,50 @@ class DictSerializable:
 
 @dataclasses.dataclass
 class Relocation(DictSerializable):
-    section: str
-    symname: str
-    symoffs: int
-    valueloc: int
-    isrelative: bool
-    islowpart: bool
-    ishighpart: bool
-    divideval: bool # if symbol value should be divided by 4
-    shift_offset: int
-    bits: int
+    _reloc_classes = {}
+
+    def to_dict(self):
+        reloc_classes_rev = {v: k for k, v in Relocation._reloc_classes.items()}
+        return {"type": reloc_classes_rev[self.__class__], "obj": dataclasses.asdict(self)}
+
+    @classmethod
+    def from_dict(cls, d):
+        return Relocation._reloc_classes[d["type"]](**d["obj"])
+    
+    def __init_subclass__(cls, /, name, **kwargs):
+        super().__init_subclass__(**kwargs)
+        Relocation._reloc_classes[name] = cls
+
+    section: str # section the relocation is in
+    section_offset: int # offset of the relocation within a section
+    pre1_rshift: int | None # preprocessing step 1: right shift
+    pre2_mask: int | None # preprocessing step 2: mask
+    dst_bits: int # width of the destination slot in bits
+    dst_shift_offset: int | None # how many bits to left shift the value before fitting it into the destination slot
+
+
+@dataclasses.dataclass
+class RelocationSymbol(Relocation, name="sym"):
+    symbol: str
+    offset: int
+    pcrel: bool
+
+
+@dataclasses.dataclass
+class RelocationSymbolDiff(Relocation, name="symdiff"):
+    # operation: val = symbola - symbolb
+    symbola: str
+    symbolb: str
 
 
 @dataclasses.dataclass
 class Symbol(DictSerializable):
     section: str
-    location: int
+    section_offset: int | None
+    local: bool # only visible to the same translation unit
+    weak: bool # maybe be overridden by non-weak symbols. If there is multiple weak symbols the linker will ignore anything but the first one. 
+    common: bool # common symbol, these will be merged if they appear in multiple translation units. The largest one dictates the size. The section_offset is ignored for common symbols.
+    common_size: int | None # size of common symbol data area.
 
 
 @dataclasses.dataclass

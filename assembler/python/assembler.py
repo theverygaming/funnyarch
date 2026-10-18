@@ -4,7 +4,6 @@ import re
 import sys
 from enum import Enum
 import preprocessor
-import linker
 import objfmt
 
 
@@ -295,6 +294,24 @@ sections = {
 current_section = ".text"
 relocations = []
 symbols = {}
+symbol_predefs = {}
+
+def symbol_get_predef(symname):
+    pd = {}
+    if symname in symbol_predefs:
+        pd = symbol_predefs[symname]
+        del symbol_predefs[symname]
+    return pd
+
+def symbol_set_attr(symname, attr, val):
+    if symname in symbols:
+        setattr(symbols[symname], attr, val)
+    elif symname in symbol_predefs:
+        symbol_predefs[symname][attr] = val
+    else:
+        symbol_predefs[symname] = {
+            attr: val,
+        }
 
 def set_section(name):
     global current_section
@@ -320,6 +337,7 @@ def align_outfile(alignment):
     for _ in range(n):
         write_out(1, ord("f"))
 
+REGXP_SYMNAME = r"[a-zA-Z0-9_\.]+"
 
 def get_operand_type(opstr):
     def parseop(str):
@@ -338,12 +356,12 @@ def get_operand_type(opstr):
         elif str[0] == "#":
             rval = int(str[1:], 0)
         else:
-            match = re.match(r"^(?P<name>\.?[a-zA-Z0-9_]+)(?:(?P<offsop>\+)(?P<offs>\d+))?(?P<attr>\.rel|\.low|\.high)?$", str)
+            match = re.match(rf"^(?P<name>{REGXP_SYMNAME})(?:(?P<offsop>\+|-)(?P<offs>\d+))?$", re.sub(r"(?P<attr>\.rel|\.low|\.high)$", "", str))
             if match is None:
                 raise Exception(f"could not match label {str}")
-            isrellabel = match.group("attr") == ".rel"
-            islowlabel = match.group("attr") == ".low"
-            ishighlabel = match.group("attr") == ".high"
+            isrellabel = str.endswith(".rel")
+            islowlabel = str.endswith(".low")
+            ishighlabel = str.endswith(".high")
             extra = (({"+": 1, "-": -1}[match.group("offsop")]) * int(match.group("offs"))) if match.group("offs") is not None else 0
             islabel = not (isrellabel or islowlabel or ishighlabel)
             rval = match.group("name")
@@ -481,17 +499,19 @@ def assemble_instr(match):
             args[i] = (0, v[1], v[2])
             shift_offset, bits = encoding_get_imm_location(instinfo.type)
             relocations.append(
-                objfmt.Relocation(
-                    current_section,
-                    v[0],
-                    v[3],
-                    len(sections[current_section].data),
-                    v[1] == OperandType.rellabel or instinfo.relsymimm,
-                    v[1] == OperandType.lowlabel,
-                    v[1] == OperandType.highlabel,
-                    instinfo.divsymimm,
-                    shift_offset,
-                    bits,
+                objfmt.RelocationSymbol(
+                    section=current_section,
+                    section_offset=len(sections[current_section].data),
+                    pre1_rshift=(
+                        (16 if v[1] == OperandType.highlabel else None)
+                        or (2 if instinfo.divsymimm else None) # >> 2 = divide by 4
+                    ),
+                    pre2_mask=0xFFFF if v[1] == OperandType.lowlabel else None,
+                    dst_bits=bits,
+                    dst_shift_offset=shift_offset,
+                    symbol=v[0],
+                    offset=v[3],
+                    pcrel=v[1] == OperandType.rellabel or instinfo.relsymimm,
                 )
             )
 
@@ -500,23 +520,110 @@ def assemble_instr(match):
     )
     write_instr(instr_assembled)
 
-
 def parse_assembler_directive(str):
+    def emit_const(s, nbytes):
+        try:
+            nums = [int(num, 0) for num in s.split(",")]
+            for num in nums:
+                write_out(nbytes, num)
+            return
+        except ValueError:
+            pass
+        match = re.match(rf"^(?P<name1>{REGXP_SYMNAME})(?:(?P<offsop>\-)(?P<name2>{REGXP_SYMNAME}))?$", s)
+        if match is None:
+            raise Exception(f"could not match const {s}")
+        if match.group("name2") is not None:
+            if match.group("offsop") != "-":
+                raise Exception("unknown offset operator")
+            relocations.append(
+                objfmt.RelocationSymbolDiff(
+                    section=current_section,
+                    section_offset=len(sections[current_section].data),
+                    pre1_rshift=None,
+                    pre2_mask=None,
+                    dst_bits=nbytes*8,
+                    dst_shift_offset=None,
+                    symbola=match.group("name1"),
+                    symbolb=match.group("name2"),
+                )
+            )
+        else:
+            relocations.append(
+                objfmt.RelocationSymbol(
+                    section=current_section,
+                    section_offset=len(sections[current_section].data),
+                    pre1_rshift=None,
+                    pre2_mask=None,
+                    dst_bits=nbytes*8,
+                    dst_shift_offset=None,
+                    symbol=match.group("name1"),
+                    offset=0,
+                    pcrel=False,
+                )
+            )
+        write_out(nbytes, 0)
+
+    def unescape_ascii_string(s):
+        # escape sequences from https://sourceware.org/binutils/docs/as/Strings.html
+        bout = bytearray()
+        i = 0
+        while i < len(s):
+            if s[i] != "\\":
+                bout += bytes(s[i], "ascii")
+                i += 1
+                continue
+            i += 1
+            esc = s[i:]
+            if len(esc) == 0:
+                print(f"WARNING: escape sequence at end of string")
+                continue
+            simple_escapes = {
+                "\\": b"\\", # literal backslash
+                "b": b"\b", # backspace
+                "f": b"\f", # form feed
+                "n": b"\n", # newline
+                "r": b"\r", # carriage return
+                "t": b"\t", # tab
+                "\"": b"\"", # double quote
+            }
+            if esc[0] in simple_escapes:
+                bout += simple_escapes[esc[0]]
+                i += 1
+            elif (m := re.match(r"^(?:(?P<hex>(?:x|X)[0-9a-fA-F]+)|(?P<oct>[0-7]{3}))", esc)) is not None:
+                if m.group("hex") is not None:
+                    x = int(m.group("hex")[1:], 16)
+                    i += len(m.group("hex"))
+                else:
+                    x = int(m.group("oct"), 8)
+                    i += len(m.group("oct"))
+                if x > 255:
+                    raise Exception(f"invalid literal {x}")
+                bout += bytes([x])
+            else:
+                # take as is
+                print(f"WARNING: invalid escape sequence \\{esc[0]}")
+                bout += bytes(esc[0], "ascii")
+                i += 1
+        return bout
+
     split = re.split(r" ", str)
     if split[0] == ".section":
         set_section(split[1])
     elif split[0] == ".string" or split[0] == ".ascii":
-        assert str[len(split[0]) + 1] == '"', 'string must be enclosed in ""'
-        assert str[len(str) - 2] == '"', 'string must be enclosed in ""'
-        write_out_bytes(bytes(str[len(split[0]) + 2 : len(str) - 2], "ascii"))
+        out_str = str[len(split[0]) + 1:].strip()
+        assert out_str[0] == '"', 'string must be enclosed in ""'
+        assert out_str[-1] == '"', 'string must be enclosed in ""'
+        out_str = out_str[1 : -1]
+        out_bytes = unescape_ascii_string(out_str)
+        write_out_bytes(out_bytes)
         if split[0] == ".string":
             write_out(1, 0)  # null terminator
     elif split[0] == ".byte":
-        write_out(1, int(split[1], 0))
+        emit_const(split[1], 1)
     elif split[0] == ".halfword":
-        write_out(2, int(split[1], 0))
+        emit_const(split[1], 2)
     elif split[0] == ".word":
-        write_out(4, int(split[1], 0))
+        emit_const(split[1], 4)
     elif split[0] == ".align":
         align_outfile(int(split[1], 0))
     elif split[0] == ".regalias":
@@ -524,23 +631,74 @@ def parse_assembler_directive(str):
         regmap_alias[split[2]] = regmap[split[1]]
     elif split[0] == ".regaliasclear":
         regmap_alias.clear()
+    elif split[0] == ".set":
+        setexpr = " ".join(split[1:])
+        m = re.match(rf"(?P<dst>{REGXP_SYMNAME}),\s*(?P<src>{REGXP_SYMNAME})", setexpr)
+        if m is None:
+            raise Exception(f"could not parse .set '{setexpr}' (supports only symbol alias)")
+        symbols[m.group("dst")] = symbols[m.group("src")]
+    elif split[0] == ".zero":
+        for _ in range(int(split[1])):
+            write_out(1, 0)
+    elif split[0] == ".comm":
+        split2 = [x.strip() for x in " ".join(split[1:]).split(",")]
+        if split2[0] in symbols:
+            raise Exception(f"symbol {split2[0]} redefined")
+        # symbols[split2[0]] = objfmt.Symbol(
+        #     **({
+        #         "section": current_section,
+        #         "section_offset": None,
+        #         "local": True,
+        #         "weak": False,
+        #         "common": True,
+        #         "common_size": int(split2[1]),
+        #     } | symbol_get_predef(split2[0]))
+        # )
+
+        # HACK: simply insert common symbols and their reserved data as if they were normal symbols. The linker doesn't support them yet lol
+        symbols[split2[0]] = objfmt.Symbol(
+            **({
+                "section": current_section,
+                "section_offset": len(sections[current_section].data), 
+                "local": True,
+                "weak": False,
+                "common": False,
+                "common_size": None,
+            } | symbol_get_predef(split2[0]))
+        )
+        write_out(int(split2[1]), 0)
+    elif split[0] == ".weak":
+        symbol_set_attr(split[1], "weak", True)
+    elif split[0] == ".local":
+        symbol_set_attr(split[1], "local", True)
+    elif split[0] == ".global":
+        symbol_set_attr(split[1], "local", False)
     else:
-        raise Exception(f"unsupported: {split[0]}")
+        raise Exception(f"unsupported directive: {split[0]}")
 
 
 def parse_assembler_label(match):
     label = match.group("label")
     if label in symbols:
-        raise Exception(f"double symbol {label}")
+        raise Exception(f"duplicate symbol {label}")
     align_outfile(4)  # FIXME: this alignment stuff is SUPER broken!!!
-    symbols[label] = objfmt.Symbol(current_section, len(sections[current_section].data))
+    symbols[label] = objfmt.Symbol(
+        **({
+            "section": current_section,
+            "section_offset": len(sections[current_section].data), 
+            "local": True,
+            "weak": False,
+            "common": False,
+            "common_size": None,
+        } | symbol_get_predef(label))
+    )
     print(f'label "{label}" at {current_section}.{len(sections[current_section].data)}')
 
 
 rg_arg = r"[A-Za-z0-9#\-_.\+\-]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
-rg_directive = r"^\.(export|extern|string|ascii|byte|halfword|word|section|align|regalias|regaliasclear)(?!:).*$"  # matches ".directive"
+rg_directive = r"^\.(export|extern|string|ascii|byte|halfword|word|section|align|regalias|regaliasclear|set|zero|comm|local|weak|global)(?!:).*$"  # matches ".directive"
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 
 

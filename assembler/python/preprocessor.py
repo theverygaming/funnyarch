@@ -38,7 +38,7 @@ def c_comment_remover(text):  # https://stackoverflow.com/a/241506
 
 
 def rmspaces(str):
-    parts = re.split(r"""("[^"]*"|'[^']*')""", str)
+    parts = re.split(r"""("(?:\\.|[^"])*")""", str)
     parts[::2] = map(lambda s: " ".join(s.split()), parts[::2])  # outside quotes
     return " ".join(parts)
 
