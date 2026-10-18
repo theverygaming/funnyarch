@@ -77,8 +77,7 @@ def to_obj_file(sections: dict[str, Section], symbols: dict[str, Symbol], reloca
         fileobj.write(sections[section["name"]].data)
 
 
-def from_obj_file(fileobj) -> tuple[dict[str, Section], list[Symbol], list[Relocation]]:
-    data = fileobj.read()
+def from_obj_file_data(data) -> tuple[dict[str, Section], list[Symbol], list[Relocation]]:
     len_meta = int.from_bytes(data[0:4], "little", signed=False)
     meta = json.loads(data[4:4 + len_meta].decode("utf-8"))
 

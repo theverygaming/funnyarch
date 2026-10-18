@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import libobjfmt as objfmt
+import libar
 
 class Linker:
     def __init__(self, ld_def):
@@ -7,6 +8,7 @@ class Linker:
         self.sections = {s["name"]: objfmt.Section(bytearray()) for s in self.ld_def["sections"]}
         self.symbols = {}
         self.relocations = []
+        self.whole_archive = False
 
     def add_input(self, sections, symbols, relocations):
         # FIXME: local syms should be handled in a less silly way lol
@@ -71,8 +73,50 @@ class Linker:
         if relocations:
             raise Exception(f"could not process all relocations - leftover: {relocations}")
 
+    def add_static_lib(self, data):
+        objfiles = {} # dict with key filename of tuples (sections, symbols, relocations)
+        for (fname, _, _, _, _, fcontent) in libar.read_ar(data):
+            if fname in objfiles:
+                raise Exception(f"duplicate filename '{fname}' in archive")
+            objfiles[fname] = objfmt.from_obj_file_data(fcontent)
+        if self.whole_archive:
+            for fname, objfile in objfiles.items():
+                print(f"adding archive member '{fname}'")
+                self.add_input(*objfile)
+            return
+        while True:
+            objs_added = 0
+            unresolved = set(self._get_unresolved_symbol_names())
+            for fname, (sections, symbols, relocations) in list(objfiles.items()):
+                if len(unresolved.intersection(symbols.keys())) == 0:
+                    continue
+                print(f"adding archive member '{fname}'")
+                self.add_input(sections, symbols, relocations)
+                # update unresolved, we may be able to resolve more from the freshly added object files in this same run
+                unresolved = set(self._get_unresolved_symbol_names())
+                objs_added += 1
+                del objfiles[fname]
+            if objs_added == 0:
+                break
+
+    def _get_unresolved_symbol_names(self):
+        referenced = set()
+        for reloc in self.relocations:
+            if isinstance(reloc, objfmt.RelocationSymbol):
+                referenced.add(reloc.symbol)
+            elif isinstance(reloc, objfmt.RelocationSymbolDiff):
+                referenced.add(reloc.symbola)
+                referenced.add(reloc.symbolb)
+            else:
+                raise Exception(f"unknown relocation type {relocation}")
+        syms = set(list(self.symbols.keys()) + [anchor["name"] for anchor in self.ld_def["anchor_symbols"]])
+        return list(referenced - syms)
+
     def link(self):
         # TODO: when we have sections at arbitiary locations in memory, check if any sections overlap in memory (due to their size) here!
+        unresolved = self._get_unresolved_symbol_names()
+        if unresolved:
+            raise Exception(f"unresolved symbols: {', '.join(unresolved)}")
         self._relocate()
 
     def dump_all(self, outfile):
@@ -149,7 +193,7 @@ class Linker:
                     relocval = symbol_loc - (reloc_section_offset + 4)
                 else:
                     relocval = symbol_loc
-            elif isinstance(relocation, objfmt.RelocationSymbolDiff):
+            elif isinstance(reloc, objfmt.RelocationSymbolDiff):
                 symbola = self._find_sym(reloc.symbola)
                 symbola_loc = self._get_section_offset(symbola.section) + symbola.section_offset
                 symbolb = self._find_sym(reloc.symbolb)
@@ -185,8 +229,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o", "--output", metavar="output", help="output file name", required=True, type=str
     )
-    parser.add_argument("input", metavar="input", help="input file names", type=str, nargs="+")
-    args = parser.parse_args()
+    args, remaining_args = parser.parse_known_args()
 
     ld = Linker(
         {
@@ -201,10 +244,20 @@ if __name__ == "__main__":
         },
     )
 
-    for inf in args.input:
+    for inf in remaining_args:
+        if inf == "--whole-archive":
+            ld.whole_archive = True
+            continue
+        elif inf == "--no-whole-archive":
+            ld.whole_archive = False
+            continue
         print(f"adding input file {inf}")
         with open(inf, "rb") as f:
-            ld.add_input(*objfmt.from_obj_file(f))
+            data = f.read()
+            if libar.detect_ar_header(data):
+                ld.add_static_lib(data)
+            else:
+                ld.add_input(*objfmt.from_obj_file_data(data))
 
     ld.link()
 
