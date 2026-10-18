@@ -4,7 +4,7 @@ import re
 import sys
 from enum import Enum
 import preprocessor
-import objfmt
+import libobjfmt as objfmt
 
 
 class InstructionType(Enum):

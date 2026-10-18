@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import objfmt
+import libobjfmt as objfmt
 
 class Linker:
     def __init__(self, ld_def):
@@ -177,7 +177,6 @@ class Linker:
 
 if __name__ == "__main__":
     import argparse
-    import objfmt
 
     parser = argparse.ArgumentParser(description="Weird compiler")
     parser.add_argument(
