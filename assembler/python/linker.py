@@ -10,6 +10,7 @@ class Linker:
         self.symbols = {}
         self.relocations = []
         self.whole_archive = False
+        self._linked_linkonce_sections = {}
 
     def add_input(self, sections, symbols, relocations):
         # FIXME: local syms should be handled in a less silly way lol
@@ -21,13 +22,25 @@ class Linker:
                 return localprefix + oldsymname
             return oldsymname
         for section_name, section in sections.items():
-            if section_name not in self.sections:
-                self.sections[section_name] = objfmt.Section(bytearray())
+            new_section_name = section_name
+            if section_name.startswith(".gnu.linkonce."):
+                if not section_name.startswith(".gnu.linkonce.t."):
+                    raise Exception(f"unsupported .gnu.linkonce section type '{section_name}'")
+                new_section_name = ".text"
+                if section_name in self._linked_linkonce_sections:
+                    if self._linked_linkonce_sections[section_name] != section.data:
+                        raise Exception(f"data in .gnu.linkonce section '{section_name}' differs")
+                    # added already, no need to do anything
+                    continue
+                self._linked_linkonce_sections[section_name] = section.data
+
+            if new_section_name not in self.sections:
+                self.sections[new_section_name] = objfmt.Section(bytearray())
 
             # offset to add to new symbols / relocations
-            offset_add_new = len(self.sections[section_name].data)
+            offset_add_new = len(self.sections[new_section_name].data)
 
-            self.sections[section_name].data += section.data
+            self.sections[new_section_name].data += section.data
 
             for symbol_name, symbol in list(symbols.items()):
                 if symbol.section != section_name:
@@ -41,6 +54,7 @@ class Linker:
                     raise Exception(f"duplicate symbol '{symbol_name}'")
 
                 # fixup symbol
+                symbol.section = new_section_name
                 symbol.section_offset += offset_add_new
 
                 self.symbols[symbol_name] = symbol
@@ -63,6 +77,7 @@ class Linker:
                     raise Exception(f"unknown relocation type {relocation}")
 
                 # fixup relocation
+                relocation.section = new_section_name
                 relocation.section_offset += offset_add_new
 
                 self.relocations.append(relocation)
