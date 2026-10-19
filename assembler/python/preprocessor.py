@@ -36,6 +36,8 @@ def c_comment_remover(text):  # https://stackoverflow.com/a/241506
     )
     return re.sub(pattern, replacer, text)
 
+def c_preprocessor_info_remover(text):
+    return re.sub(r"^\s*#\s+\d+\s+\"(?:\\.|[^\"])+\"(?:(?:\s+\d+)+)?$", "", text, flags=re.DOTALL | re.MULTILINE)
 
 def rmspaces(str):
     parts = re.split(r"""("(?:\\.|[^"])*")""", str)
@@ -140,6 +142,7 @@ def resolveincludes(str, includepaths):
 
 def preprocess(str, includepaths):
     str = c_comment_remover(str)
+    str = c_preprocessor_info_remover(str)
     str = resolveincludes(str, includepaths)
     macros_c = list(__builtin_macros)
     while True:
