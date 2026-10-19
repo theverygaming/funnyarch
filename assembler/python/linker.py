@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import libobjfmt as objfmt
 import libar
+import json
 
 class Linker:
     def __init__(self, ld_def):
@@ -21,7 +22,7 @@ class Linker:
             return oldsymname
         for section_name, section in sections.items():
             if section_name not in self.sections:
-                raise Exception(f"file added with unknown section '{section_name}'")
+                self.sections[section_name] = objfmt.Section(bytearray())
 
             # offset to add to new symbols / relocations
             offset_add_new = len(self.sections[section_name].data)
@@ -119,9 +120,13 @@ class Linker:
             raise Exception(f"unresolved symbols: {', '.join(unresolved)}")
         self._relocate()
 
-    def dump_all(self, outfile):
+    def write_bin(self, outfile):
         for sec in self.ld_def["sections"]:
             self.dump_section(sec["name"], outfile)
+
+    def dump_relocatable(self, outfile):
+        # TODO: symbols should have an extra thingy with their current value attached to them. This would allow tools like nm to exist!
+        objfmt.to_obj_file(self.sections, self.symbols, self.relocations, outfile)
 
     def dump_section(self, section, outfile):
         outfile.write(self.sections[section].data)
@@ -170,8 +175,9 @@ class Linker:
             # TODO: support weak symbols
             if symname in self.symbols:
                 raise Exception(f"duplicate symbol '{symname}'")
-            # FIXME: so relocate can safely run multiple times, this should NOT write self.symbols and
-            # instead keep symbols in some local var.. this would also solve overriding weak symbols :)
+            # FIXME: so relocate can safely run multiple times, this should NOT write self.symbols (unless
+            # we are producing a relocatable object!!!) and instead keep symbols in some
+            # local var.. this would also solve overriding weak symbols :)
             print(f"anchor in '{section}' at {section_offset} name {symname}")
             self.symbols[symname] = objfmt.Symbol(
                 section=section,
@@ -229,20 +235,31 @@ if __name__ == "__main__":
     parser.add_argument(
         "-o", "--output", metavar="output", help="output file name", required=True, type=str
     )
+    parser.add_argument(
+        "-r", "--relocatable", help="produce a relocatable object file as output", action="store_true"
+    )
+    parser.add_argument(
+        "-T", "--script", metavar="script", help="linker script (JSON)", type=str
+    )
     args, remaining_args = parser.parse_known_args()
 
-    ld = Linker(
-        {
-            "start": args.origin,
-            "sections": [
-                {"name": ".entry"},
-                {"name": ".text"},
-                {"name": ".rodata"},
-                {"name": ".data"},
-            ],
-            "anchor_symbols": [],
-        },
-    )
+    ldscript = {
+        "start": args.origin,
+        "sections": [
+            {"name": ".entry"},
+            {"name": ".text"},
+            {"name": ".rodata"},
+            {"name": ".data"},
+            {"name": ".bss"},
+        ],
+        "anchor_symbols": [],
+    }
+    if args.script:
+        print(f"using linker script '{args.script}'")
+        with open(args.script, "r", encoding="utf-8") as f:
+            ldscript = json.loads(f.read())
+
+    ld = Linker(ldscript)
 
     for inf in remaining_args:
         if inf == "--whole-archive":
@@ -259,7 +276,12 @@ if __name__ == "__main__":
             else:
                 ld.add_input(*objfmt.from_obj_file_data(data))
 
-    ld.link()
+    # FIXME: If the output is relocatable we should resolve all symbol references for a tool like nm to be possible
+    if not args.relocatable:
+        ld.link()
 
     with open(args.output, "w+b") as f:
-        ld.dump_all(f)
+        if args.relocatable:
+            ld.dump_relocatable(f)
+        else:
+            ld.write_bin(f)
