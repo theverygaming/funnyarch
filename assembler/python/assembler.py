@@ -468,9 +468,9 @@ def assemble_instr(match):
     )
     if instr not in instructions:
         raise Exception(f"{instr} not in instruction list")
-    print(
-        f"instr: {match.group('cond') + ' ' if cond != 0 else ''}{instr} {', '.join(args)}"
-    )
+    # print(
+    #     f"instr: {match.group('cond') + ' ' if cond != 0 else ''}{instr} {', '.join(args)}"
+    # )
 
     for i, v in enumerate(args):
         val, opt, extra = get_operand_type(v)
@@ -692,7 +692,7 @@ def parse_assembler_label(match):
             "common_size": None,
         } | symbol_get_predef(label))
     )
-    print(f'label "{label}" at {current_section}.{len(sections[current_section].data)}')
+    # print(f'label "{label}" at {current_section}.{len(sections[current_section].data)}')
 
 
 rg_arg = r"[A-Za-z0-9#\-_.\+\-]+"
@@ -730,7 +730,7 @@ def genregex():
     print(f"{list(regmap.keys())[-1]}")
 
 if __name__ == "__main__":
-    genregex()
+    # genregex()
 
     import argparse
 
@@ -756,7 +756,7 @@ if __name__ == "__main__":
         try:
             pos = len(sections[current_section].data)
             assembleinstr(line)
-            print(f"<0x{pos:x}> {line}")
+            # print(f"<0x{pos:x}> {line}")
         except Exception as e:
             raise Exception(f'error on line: "{line}"') from e
 
