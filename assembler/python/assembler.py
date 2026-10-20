@@ -520,7 +520,7 @@ def assemble_instr(match):
     )
     write_instr(instr_assembled)
 
-def parse_assembler_directive(str):
+def parse_assembler_directive(str, include_paths):
     def emit_const(s, nbytes):
         try:
             nums = [int(num, 0) for num in s.split(",")]
@@ -673,6 +673,22 @@ def parse_assembler_directive(str):
         symbol_set_attr(split[1], "local", True)
     elif split[0] == ".global":
         symbol_set_attr(split[1], "local", False)
+    elif split[0] == ".incbin":
+        match = re.match(r"^\"(?P<name>[^\"]+)\"(?:,(?P<skip>\d+)(?:,(?P<count>\d+))?)?$", "".join(split[1:]))
+        if match is None:
+            raise Exception("invalid .incbin directive")
+        data = None
+        for path in include_paths:
+            p = os.path.join(path, match.group("name"))
+            if not os.path.isfile(p):
+                continue
+            with open(p, "rb") as f:
+                f.seek(int(match.group("skip") or 0))
+                data = f.read(int(match.group("count") or -1))
+                break
+        if data is None:
+            raise Exception(".incbin file not found in include path")
+        write_out_bytes(data)
     else:
         raise Exception(f"unsupported directive: {split[0]}")
 
@@ -698,13 +714,13 @@ def parse_assembler_label(match):
 rg_arg = r"[A-Za-z0-9#\-_.\+\-]+"
 rg_instr = rf"^(?:(?P<cond>(?:{'|'.join(conditionmap.keys())})?) +)?(?P<instr>[a-z]+)(?: (?P<arg1>{rg_arg})(?:, (?P<arg2>{rg_arg})(?:, (?P<arg3>{rg_arg}))?)?)?$"
 
-rg_directive = r"^\.(export|extern|string|ascii|byte|halfword|word|section|align|regalias|regaliasclear|set|zero|comm|local|weak|global)(?!:).*$"  # matches ".directive"
+rg_directive = r"^\.(export|extern|string|ascii|byte|halfword|word|section|align|regalias|regaliasclear|set|zero|comm|local|weak|global|incbin)(?!:).*$"  # matches ".directive"
 rg_label = r"^(?P<label>[A-Za-z0-9_.]+)\:$"  # matches "label:"
 
 
-def assembleinstr(str):
+def assembleinstr(str, include_paths):
     if re.match(rg_directive, str) is not None:
-        parse_assembler_directive(str)
+        parse_assembler_directive(str, include_paths)
         return
     elif re.match(rg_label, str) is not None:
         parse_assembler_label(re.match(rg_label, str))
@@ -742,10 +758,12 @@ if __name__ == "__main__":
     parser.add_argument("-I", "--includepath", metavar="includepath", help="include paths", type=str, nargs="+")
     args = parser.parse_args()
 
+    include_paths = [os.path.dirname(os.path.realpath(args.input))] + (args.includepath or [])
+
     with open(args.input) as infile:
         try:
             infilec = preprocessor.preprocess(
-                infile.read(), [os.path.dirname(os.path.realpath(args.input))] + (args.includepath or [])
+                infile.read(), include_paths
             )
         except Exception as e:
             raise Exception("preprocessor error") from e
@@ -755,7 +773,7 @@ if __name__ == "__main__":
             continue
         try:
             pos = len(sections[current_section].data)
-            assembleinstr(line)
+            assembleinstr(line, include_paths)
             # print(f"<0x{pos:x}> {line}")
         except Exception as e:
             raise Exception(f'error on line: "{line}"') from e
