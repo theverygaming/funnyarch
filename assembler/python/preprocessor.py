@@ -128,7 +128,10 @@ def resolveincludes(str, includepaths):
         if match is not None:
             newstr = None
             for path in includepaths:
-                with open(os.path.join(path, match.group("fname"))) as w:
+                p = os.path.join(path, match.group("fname"))
+                if not os.path.isfile(p):
+                    continue
+                with open(p) as w:
                     newstr = w.read()
                     break
             if newstr is None:
