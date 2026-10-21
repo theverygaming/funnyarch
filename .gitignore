@@ -34,3 +34,5 @@ __pycache__/
 /emulator/emu.js
 /emulator/emu.wasm
 /node_modules
+
+/result
