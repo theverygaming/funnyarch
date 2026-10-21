@@ -1,4 +1,6 @@
-{ pkgs ? import <nixpkgs> {} }:
+{
+  pkgs ? import <nixpkgs> { },
+}:
 
 pkgs.mkShell {
   nativeBuildInputs = with pkgs.buildPackages; [
@@ -6,11 +8,11 @@ pkgs.mkShell {
     gradle
     libglvnd
     (vscode-with-extensions.override {
-    vscodeExtensions = with vscode-extensions; [
-      vscjava.vscode-gradle
-      vscjava.vscode-java-debug
-      redhat.java
-    ];
+      vscodeExtensions = with vscode-extensions; [
+        vscjava.vscode-gradle
+        vscjava.vscode-java-debug
+        redhat.java
+      ];
     })
   ];
   shellHook = ''
