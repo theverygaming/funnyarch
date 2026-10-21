@@ -1,6 +1,7 @@
 #include <components/component.h>
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
 
 static struct hdd {
     FILE *file;
@@ -87,17 +88,25 @@ static bool hdd_write_callback(uint32_t addr, uint32_t data) {
     return false;
 }
 
+void hdd_set_file(const char *hdfile) {
+    if (hdfile == nullptr) {
+        return;
+    }
+    hdd_state.file = fopen(hdfile, "r+");
+    if (hdd_state.file != NULL) {
+        fseek(hdd_state.file, 0, SEEK_END);
+        hdd_state.numsectors = ftell(hdd_state.file) / 512;
+    } else {
+        hdd_state.numsectors = 0;
+    }
+}
+
 static void __attribute__((constructor)) init() {
-    hdd_state.file = fopen("hd.bin", "r+");
+    hdd_state.file = nullptr;
     hdd_state.command = 0;
     hdd_state.finished = 0;
     hdd_state.sector_idx = 0;
     hdd_state.numsectors = 0;
-
-    if (hdd_state.file != NULL) {
-        fseek(hdd_state.file, 0, SEEK_END);
-        hdd_state.numsectors = ftell(hdd_state.file) / 512;
-    }
 
     databuf = new uint8_t[512];
     memset(databuf, 0, 512);

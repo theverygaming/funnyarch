@@ -6,7 +6,6 @@
 #include "imgui/imgui_impl_sdlrenderer2.h"
 #endif
 #include <SDL2/SDL.h>
-#include <cstdbool>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>

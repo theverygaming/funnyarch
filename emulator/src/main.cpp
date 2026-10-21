@@ -1,9 +1,12 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <getopt.h>
+#include <unistd.h>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -255,20 +258,84 @@ static inline void main_loop() {
 #endif
 }
 
-int main(int, char *[]) {
+void hdd_set_file(const char *hdfile);
+
+int main(int argc, char **argv) {
+    const char *romfile = nullptr;
+    const char *hdfile = nullptr;
+    int opt;
+    while ((opt = getopt(argc, argv, "hr:d:m:")) != -1) {
+        switch (opt) {
+            case 'h': {
+                fprintf(stderr, "usage: %s [-h] [-r romfile] [-d hdfile] [-m amount<K(iB)/M(iB)> e.g. 2M]\n", argv[0]);
+                return 0;
+                break;
+            }
+            case 'r': {
+                romfile = optarg;
+                break;
+            }
+            case 'd': {
+                hdfile = optarg;
+                break;
+            }
+            case 'm': {
+                size_t arglen = strlen(optarg);
+                long val = strtol(optarg, nullptr, 10);
+                if (val == 0) {
+                    fprintf(stderr, "invalid amount of memory: '%s'\n", optarg);
+                    return 1;
+                }
+                if (optarg[arglen-1] == 'K') {
+                    val <<= 10;
+                } else if (optarg[arglen-1] == 'M') {
+                    val <<= 20;
+                }
+                mem::ram_bytes = val;
+                break;
+            }
+            case '?': {
+                return 1;
+                break;
+            }
+        }
+    }
+
+    fprintf(stderr, "funnyarch emulator\n");
+    size_t mem_pretty_n = mem::ram_bytes;
+    const char *mem_pretty_prefix = "";
+    const char *mem_pretty_suffix = "B";
+    if (mem_pretty_n >= 5 << 20) {
+        if (mem_pretty_n & ((1 << 20) - 1)) {
+            mem_pretty_prefix = "~";
+        }
+        mem_pretty_n >>= 20;
+        mem_pretty_suffix = "MiB";
+    } else if (mem_pretty_n >= 5 << 10) {
+        if (mem_pretty_n & ((1 << 10) - 1)) {
+            mem_pretty_prefix = "~";
+        }
+        mem_pretty_n >>= 10;
+        mem_pretty_suffix = "KiB";
+    }
+    fprintf(stderr, "with %s%zu%s of memory\n", mem_pretty_prefix, mem_pretty_n, mem_pretty_suffix);
+
     init_emu();
+    hdd_set_file(hdfile);
 #ifdef SDLCLASS_USE_IMGUI
     sdl_ctx.set_imgui_render_func(&imgui_debug_window);
     sdl_ctx.set_buf(mem::mem_fb, FB_BYTES);
 #endif
 
-    std::ifstream input("output.bin", std::ios::binary);
-    if (!input.good()) {
-        fprintf(stderr, "failed to read output.bin\n");
-        return 1;
+    if (romfile != nullptr) {
+        std::ifstream input(romfile, std::ios::binary);
+        if (!input.good()) {
+            fprintf(stderr, "failed to read '%s'\n", romfile);
+            return 1;
+        }
+        input.read((char *)&mem::mem_rom[0], ROM_BYTES);
+        input.close();
     }
-    input.read((char *)&mem::mem_rom[0], ROM_BYTES);
-    input.close();
 
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(main_loop, 0, 1);
