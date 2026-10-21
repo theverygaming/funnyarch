@@ -17,6 +17,10 @@ mov r0, int_handler
 or r0, r0, #0x1 // no jump table
 mtsr ibptr, r0
 
+mov r0, str_mem
+rcall(serial_puts)
+mov r0, tile_mem
+rcall(draw_tile)
 rcall(memdetect)
 mov REG_MEMSTART, r6
 mov REG_MEMEND, r5
@@ -29,6 +33,8 @@ mov rsp, REG_MEMEND // stack grows down, set stack pointer to highest memory add
 
 mov r0, str_boot
 rcall(serial_puts)
+mov r0, tile_boot
+rcall(draw_tile)
 // read the first sector
 mov r0, #0
 rcall(hdd_read)
@@ -44,6 +50,8 @@ ifneq rjmp .noboot
 push(r0)
 mov r0, str_booting
 rcall(serial_puts)
+mov r0, tile_w
+rcall(draw_tile)
 pop(r0)
 
 // copy bootsector to memory
@@ -59,16 +67,22 @@ add rip, REG_MEMSTART, #4
 .noboot:
 mov r0, str_nobootmagic
 rcall(serial_puts)
+mov r0, tile_nomagic
+rcall(draw_tile)
 rjmp die
 
 .nomem:
 mov r0, str_nomem
 rcall(serial_puts)
+mov r0, tile_nomem
+rcall(draw_tile)
 rjmp die
 
 .lowmem:
 mov r0, str_lowmem
 rcall(serial_puts)
+mov r0, tile_nomem
+rcall(draw_tile)
 rjmp die
 
 die:
@@ -96,7 +110,8 @@ ret
 memdetect:
 mov r0, #0 // r0: amount of bytes
 mov r1, #0x0000 // r1: current address
-mov r4, #0xFFFF // r4: max address
+mov r4, #0x0000 // r4: max address
+movh r4, #0x0400
 mov r5, #0 // r5: highest address
 mov r6, #0 // r6: lowest address
 .memdetect_L1:
@@ -166,19 +181,69 @@ rcall(write_serial)
 mov lr, r3
 ret
 
+// pointer to 64x64 1bpp tile in r0
+// trashes: r0, r1, r2, r3, r4
+draw_tile:
+// r0 = tile addr
+mov r1, #0x4124 // r1 = fb addr (calculated to get the 64x64 tile into the center) - hex(0xF0000000 + (((((480//2)-(64//2))*640)+((640//2)-(64//2)))//8))
+movh r1, #0xF000
+mov r2, #64 // r2 = height
+.draw_tile_looph:
+cmp r2, #0
+ifeq rjmp .draw_tile_end
+mov r3, #0
+.draw_tile_loopw:
+ldri r4, r0, #4
+stri r1, r4, #4
+add r3, #1
+cmp r3, #2 // width = 2
+iflt rjmp .draw_tile_loopw
+sub r2, #1
+add r1, #72 // 80 (pitch) - 2*4 (width) = 72
+rjmp .draw_tile_looph
+.draw_tile_end:
+ret
 
+.align 4
+str_mem:
+.string "detecting memory"
+
+.align 4
 str_nomem:
 .string "error: No memory detected"
+
 .align 4
 str_boot:
-.string "funnyarch ROM entry"
+.string "booting..."
+
 .align 4
 str_lowmem:
 .string "error: too little memory to boot"
+
 .align 4
 str_nobootmagic:
 .string "error: no bootsector magic bytes found"
+
 .align 4
 str_booting:
 .string "loading and jumping to bootsector"
+
 .align 4
+tile_mem:
+.incbin "tiles/mem.raw"
+
+.align 4
+tile_nomem:
+.incbin "tiles/nomem.raw"
+
+.align 4
+tile_boot:
+.incbin "tiles/boot.raw"
+
+.align 4
+tile_nomagic:
+.incbin "tiles/nomagic.raw"
+
+.align 4
+tile_w:
+.incbin "tiles/w.raw"
