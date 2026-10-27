@@ -221,7 +221,7 @@ class Linker:
                 symbolb_loc = self._get_section_offset(symbolb.section) + symbolb.section_offset
                 relocval = symbola_loc - symbolb_loc
             else:
-                raise Exception(f"unknown relocation type {relocation}")
+                raise Exception(f"unknown relocation type {reloc}")
             
             if reloc.pre1_rshift is not None:
                 relocval >>= reloc.pre1_rshift
@@ -229,7 +229,7 @@ class Linker:
                 relocval &= reloc.pre2_mask
 
             if relocval > pow(2, reloc.dst_bits):
-                raise Exception(f"relocation {relocation} does not fit")
+                raise Exception(f"relocation {reloc} does not fit")
 
             value = self._read_uint_section(reloc.section, reloc.section_offset, 4)
             mask = (1 << reloc.dst_bits) - 1
