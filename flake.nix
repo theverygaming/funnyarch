@@ -51,7 +51,8 @@
 
           buildPhase = ''
             funnyarch-none-none-as rom/main.asm -o rom.o
-            funnyarch-none-none-ld --origin 0 -o rom.bin rom.o
+            funnyarch-none-none-ld --origin 0 -o rom_linked.o rom.o
+            funnyarch-none-none-objcopy -O binary rom_linked.o rom.bin
           '';
 
           installPhase = ''
