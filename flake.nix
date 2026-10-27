@@ -71,6 +71,15 @@
             cp emu "$out/bin"/funnyarch-emulator
           '';
         };
+        packages.emulator-nographics = packages.emulator.overrideAttrs (
+          finalAttrs: previousAttrs: {
+            env.NIX_CFLAGS_COMPILE = "-D NO_GRAPHICS";
+            installPhase = ''
+              mkdir -p "$out/bin"
+              cp emu "$out/bin"/funnyarch-emulator-nographics
+            '';
+          }
+        );
         packages.gcc = pkgs.stdenv.mkDerivation rec {
           name = "gcc-funnyarch-none-none";
 

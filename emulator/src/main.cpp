@@ -17,7 +17,9 @@
 #include "cpu.h"
 #include "mem.h"
 
+#ifndef NO_GRAPHICS
 #define GRAPHICS
+#endif
 
 #ifdef GRAPHICS
 #define SDLCLASS_USE_IMGUI
