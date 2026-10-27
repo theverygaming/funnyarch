@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 
 #define SDLCLASS_ALIGN_UP(value, alignment)   (((value) + (alignment)-1) & ~((alignment)-1))
 #define SDLCLASS_ALIGN_DOWN(value, alignment) ((value) & ~((alignment)-1))
@@ -27,6 +28,7 @@ class SDL {
 public:
     SDL() {
         if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+            fprintf(stderr, "SDL video init failed. Set SDL_VIDEODRIVER=dummy to bypass this.\n");
             exit(1);
         }
         SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");

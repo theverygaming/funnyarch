@@ -7,6 +7,7 @@
 #include <fstream>
 #include <getopt.h>
 #include <unistd.h>
+#include <cstring>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
