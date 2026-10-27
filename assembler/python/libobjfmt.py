@@ -57,16 +57,17 @@ class Symbol(DictSerializable):
     weak: bool # maybe be overridden by non-weak symbols. If there is multiple weak symbols the linker will ignore anything but the first one. 
     common: bool # common symbol, these will be merged if they appear in multiple translation units. The largest one dictates the size. The section_offset is ignored for common symbols.
     common_size: int | None # size of common symbol data area.
-
+    value: int | None = None # resolved value, set by the linker during relocation
 
 @dataclasses.dataclass
 class Section:
     data: bytearray
+    base_addr: int | None = None # set by the linker during relocation
 
 
 def to_obj_file(sections: dict[str, Section], symbols: dict[str, Symbol], relocations: list[Relocation], fileobj):
     meta_d = {
-        "sections": [{"name": k, "length": len(v.data)} for k, v in sections.items()],
+        "sections": [{"name": k, "length": len(v.data), "base_addr": v.base_addr} for k, v in sections.items()],
         "symbols": {k: v.to_dict() for k, v in symbols.items()},
         "relocations": [r.to_dict() for r in relocations],
     }
@@ -85,7 +86,7 @@ def from_obj_file_data(data) -> tuple[dict[str, Section], list[Symbol], list[Rel
     dptr = 4 + len_meta
     for section in meta["sections"]:
         slen = section["length"]
-        sections[section["name"]] = Section(data[dptr:dptr+slen])
+        sections[section["name"]] = Section(data=data[dptr:dptr+slen], base_addr=section["base_addr"])
         dptr += slen
 
     symbols = {k: Symbol.from_dict(v) for k, v in meta["symbols"].items()}

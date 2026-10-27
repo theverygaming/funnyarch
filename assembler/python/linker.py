@@ -135,16 +135,17 @@ class Linker:
             raise Exception(f"unresolved symbols: {', '.join(unresolved)}")
         self._relocate()
 
-    def write_bin(self, outfile):
-        for sec in self.ld_def["sections"]:
-            self.dump_section(sec["name"], outfile)
-
-    def dump_relocatable(self, outfile):
-        # TODO: symbols should have an extra thingy with their current value attached to them. This would allow tools like nm to exist!
+    def dump_obj_relocatable(self, outfile):
         objfmt.to_obj_file(self.sections, self.symbols, self.relocations, outfile)
 
-    def dump_section(self, section, outfile):
-        outfile.write(self.sections[section].data)
+    def dump_obj_nonrelocatable(self, outfile):
+        legal_sections = [sec["name"] for sec in self.ld_def["sections"]]
+        objfmt.to_obj_file(
+            {k: v for k, v in self.sections.items() if k in legal_sections},
+            {k: v for k, v in self.symbols.items() if v.section in legal_sections},
+            [],
+            outfile,
+        )
 
     def _get_section_offset(self, secname):
         current = self.ld_def["start"]
@@ -168,6 +169,11 @@ class Linker:
         return int.from_bytes(self.sections[secname].data[offset:offset + bytes_], "little", signed=False)
 
     def _relocate(self):
+        def _reloc_get_symloc(symname):
+            symbol = self._find_sym(symname)
+            symval = self._get_section_offset(symbol.section) + symbol.section_offset
+            return symval
+
         # handle common symbols
         for symbol in self.symbols.values():
             if not symbol.common:
@@ -203,22 +209,29 @@ class Linker:
                 common_size=None,
             )
 
+        # compute section base addrs
+        for secname, sec in self.sections.items():
+            baseaddr = self._get_section_offset(secname)
+            sec.base_addr = baseaddr
+
+        # compute all symbol values
+        for symname, sym in self.symbols.items():
+            sym.value = _reloc_get_symloc(symname)
+
+        # and finally, relocate!
         for reloc in self.relocations:
             relocval = 0
 
             if isinstance(reloc, objfmt.RelocationSymbol):
-                symbol = self._find_sym(reloc.symbol)
-                symbol_loc = self._get_section_offset(symbol.section) + symbol.section_offset + reloc.offset
+                symbol_loc = _reloc_get_symloc(reloc.symbol) + reloc.offset
                 if reloc.pcrel:
                     reloc_section_offset = self._get_section_offset(reloc.section) + reloc.section_offset
                     relocval = symbol_loc - (reloc_section_offset + 4)
                 else:
                     relocval = symbol_loc
             elif isinstance(reloc, objfmt.RelocationSymbolDiff):
-                symbola = self._find_sym(reloc.symbola)
-                symbola_loc = self._get_section_offset(symbola.section) + symbola.section_offset
-                symbolb = self._find_sym(reloc.symbolb)
-                symbolb_loc = self._get_section_offset(symbolb.section) + symbolb.section_offset
+                symbola_loc = _reloc_get_symloc(reloc.symbola)
+                symbolb_loc = _reloc_get_symloc(reloc.symbolb)
                 relocval = symbola_loc - symbolb_loc
             else:
                 raise Exception(f"unknown relocation type {reloc}")
@@ -291,12 +304,12 @@ if __name__ == "__main__":
             else:
                 ld.add_input(*objfmt.from_obj_file_data(data))
 
-    # FIXME: If the output is relocatable we should resolve all symbol references for a tool like nm to be possible
     if not args.relocatable:
         ld.link()
 
     with open(args.output, "w+b") as f:
         if args.relocatable:
-            ld.dump_relocatable(f)
+            ld.dump_obj_relocatable(f)
         else:
-            ld.write_bin(f)
+            ld.dump_obj_nonrelocatable(f)
+            #ld.write_bin(f)

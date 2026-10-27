@@ -36,6 +36,8 @@
             cp -r preprocessor.py "$out/bin/preprocessor.py"
             cp -r assembler.py "$out/bin/funnyarch-none-none-as"
             cp -r linker.py "$out/bin/funnyarch-none-none-ld"
+            cp -r objcopy.py "$out/bin/funnyarch-none-none-objcopy"
+            cp -r nm.py "$out/bin/funnyarch-none-none-nm"
           '';
         };
         packages.rom = pkgs.stdenv.mkDerivation rec {

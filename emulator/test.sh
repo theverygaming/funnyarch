@@ -9,7 +9,9 @@ python3 ../assembler/python/assembler.py ../asm/rom/main.asm -o output.o
 #python3 ../assembler/python/assembler.py ../asm/videoplayer/main.asm -o output.o
 #python3 ../asm/videoplayer/gen.py ../asm/videoplayer/source.mp4 hd.bin
 
-python3 ../assembler/python/linker.py --origin 0 -o output.bin output.o
+python3 ../assembler/python/linker.py --origin 0 -o output_linked.o output.o
+python3 ../assembler/python/nm.py --format=bsd -n output_linked.o
+python3 ../assembler/python/objcopy.py -O binary output_linked.o output.bin
 
 #make clean
 #make -j$(nproc) TARGET=linux-gcov
