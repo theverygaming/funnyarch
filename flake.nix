@@ -77,8 +77,8 @@
           src = pkgs.fetchFromGitHub {
             owner = "theverygaming";
             repo = "gcc";
-            rev = "25ef612b151ecd6fa6c0af74d76b64a13a06c55f";
-            sha256 = "sha256-JQ00wmzPkjuY+9xEHhxrYjFsHs6s6BFloi6WCekHCB8=";
+            rev = "a5dd521f68b585780dfb30113fb586f6c7254edd";
+            sha256 = "sha256-3hhgiFOEVcw8bE8D2SgnSBWFnY4naIwyc3IJ+hN6t7k=";
           };
 
           # somehow breaks our config.sub modifications???
