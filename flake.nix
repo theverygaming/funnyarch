@@ -89,8 +89,8 @@
           src = pkgs.fetchFromGitHub {
             owner = "theverygaming";
             repo = "gcc";
-            rev = "a5dd521f68b585780dfb30113fb586f6c7254edd";
-            sha256 = "sha256-3hhgiFOEVcw8bE8D2SgnSBWFnY4naIwyc3IJ+hN6t7k=";
+            rev = "4f5bebe181fdd0414e395902c30954b3f2622081";
+            sha256 = "sha256-38OGAwvL9rqKcvNtjp98sRFBUOoOBEbTO8+HVXKkOwE=";
           };
 
           # somehow breaks our config.sub modifications???
@@ -132,7 +132,7 @@
 
           buildPhase = ''
             make -j$NIX_BUILD_CORES all-gcc
-            make -j$NIX_BUILD_CORES all-target-libgcc CFLAGS_FOR_TARGET='-fomit-frame-pointer -fno-merge-constants -mno-unaligned-access'
+            make -j$NIX_BUILD_CORES all-target-libgcc CFLAGS_FOR_TARGET='-fomit-frame-pointer -fno-merge-constants -mno-unaligned-access -fpic -mpic-data-is-text-relative'
           '';
 
           installPhase = ''
