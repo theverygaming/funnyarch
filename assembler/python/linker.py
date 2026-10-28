@@ -128,12 +128,12 @@ class Linker:
         syms = set(list(self.symbols.keys()) + [anchor["name"] for anchor in self.ld_def["anchor_symbols"]])
         return list(referenced - syms)
 
-    def link(self):
+    def link(self, relative_only):
         # TODO: when we have sections at arbitiary locations in memory, check if any sections overlap in memory (due to their size) here!
         unresolved = self._get_unresolved_symbol_names()
         if unresolved:
             raise Exception(f"unresolved symbols: {', '.join(unresolved)}")
-        self._relocate()
+        self._relocate(relative_only)
 
     def dump_obj_relocatable(self, outfile):
         objfmt.to_obj_file(self.sections, self.symbols, self.relocations, outfile)
@@ -147,8 +147,8 @@ class Linker:
             outfile,
         )
 
-    def _get_section_offset(self, secname):
-        current = self.ld_def["start"]
+    def _get_section_offset(self, secname, relative_only):
+        current = self.ld_def["start"] if not relative_only else 0
         for sec in self.ld_def["sections"]:
             if sec["name"] == secname:
                 return current
@@ -168,10 +168,10 @@ class Linker:
     def _read_uint_section(self, secname, offset, bytes_):
         return int.from_bytes(self.sections[secname].data[offset:offset + bytes_], "little", signed=False)
 
-    def _relocate(self):
+    def _relocate(self, relative_only):
         def _reloc_get_symloc(symname):
             symbol = self._find_sym(symname)
-            symval = self._get_section_offset(symbol.section) + symbol.section_offset
+            symval = self._get_section_offset(symbol.section, relative_only) + symbol.section_offset
             return symval
 
         # handle common symbols
@@ -211,7 +211,7 @@ class Linker:
 
         # compute section base addrs
         for secname, sec in self.sections.items():
-            baseaddr = self._get_section_offset(secname)
+            baseaddr = self._get_section_offset(secname, relative_only)
             sec.base_addr = baseaddr
 
         # compute all symbol values
@@ -225,10 +225,12 @@ class Linker:
             if isinstance(reloc, objfmt.RelocationSymbol):
                 symbol_loc = _reloc_get_symloc(reloc.symbol) + reloc.offset
                 if reloc.pcrel:
-                    reloc_section_offset = self._get_section_offset(reloc.section) + reloc.section_offset
+                    reloc_section_offset = self._get_section_offset(reloc.section, relative_only) + reloc.section_offset
                     relocval = symbol_loc - (reloc_section_offset + 4)
                 else:
                     relocval = symbol_loc
+                    if relative_only:
+                        raise Exception(f"non-relative reloc in relative only mode {reloc}")
             elif isinstance(reloc, objfmt.RelocationSymbolDiff):
                 symbola_loc = _reloc_get_symloc(reloc.symbola)
                 symbolb_loc = _reloc_get_symloc(reloc.symbolb)
@@ -265,6 +267,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "-r", "--relocatable", help="produce a relocatable object file as output", action="store_true"
+    )
+    parser.add_argument(
+        "--relative-only", help="error when encountering a non-relative relocation (useful for catching errors when linking position independent code)", action="store_true"
     )
     parser.add_argument(
         "-T", "--script", metavar="script", help="linker script (JSON)", type=str
@@ -305,7 +310,7 @@ if __name__ == "__main__":
                 ld.add_input(*objfmt.from_obj_file_data(data))
 
     if not args.relocatable:
-        ld.link()
+        ld.link(args.relative_only)
 
     with open(args.output, "w+b") as f:
         if args.relocatable:
