@@ -24,8 +24,10 @@ class OperandType(Enum):
     imm23 = 4
     label = 5
     rellabel = 6
-    lowlabel = 7
-    highlabel = 8
+    rellowlabel = 7
+    relhighlabel = 8
+    lowlabel = 9
+    highlabel = 10
 
     def isimm(self):
         return (
@@ -356,10 +358,10 @@ def get_operand_type(opstr):
         elif str[0] == "#":
             rval = int(str[1:], 0)
         else:
-            match = re.match(rf"^(?P<name>{REGXP_SYMNAME})(?:(?P<offsop>\+|-)(?P<offs>\d+))?$", re.sub(r"(?P<attr>\.rel|\.low|\.high)$", "", str))
+            match = re.match(rf"^(?P<name>{REGXP_SYMNAME})(?:(?P<offsop>\+|-)(?P<offs>\d+))?$", re.sub(r"(?P<attr>\.rel|\.rel\.low|\.rel\.high|\.low|\.high)$", "", str))
             if match is None:
                 raise Exception(f"could not match label {str}")
-            isrellabel = str.endswith(".rel")
+            isrellabel = str.endswith(".rel") or str.endswith(".rel.low") or str.endswith(".rel.high")
             islowlabel = str.endswith(".low")
             ishighlabel = str.endswith(".high")
             extra = (({"+": 1, "-": -1}[match.group("offsop")]) * int(match.group("offs"))) if match.group("offs") is not None else 0
@@ -373,6 +375,10 @@ def get_operand_type(opstr):
     isreg, islabel, isrellabel, islowlabel, ishighlabel, val, extra = parseop(opstr)
     if isreg:
         optype = OperandType.register
+    elif isrellabel and islowlabel:
+        optype = OperandType.rellowlabel
+    elif isrellabel and ishighlabel:
+        optype = OperandType.relhighlabel
     elif isrellabel:
         optype = OperandType.rellabel
     elif islowlabel:
@@ -503,15 +509,15 @@ def assemble_instr(match):
                     section=current_section,
                     section_offset=len(sections[current_section].data),
                     pre1_rshift=(
-                        (16 if v[1] == OperandType.highlabel else None)
+                        (16 if v[1] in [OperandType.highlabel, OperandType.relhighlabel] else None)
                         or (2 if instinfo.divsymimm else None) # >> 2 = divide by 4
                     ),
-                    pre2_mask=0xFFFF if v[1] == OperandType.lowlabel else None,
+                    pre2_mask=0xFFFF if v[1] in [OperandType.lowlabel, OperandType.rellowlabel] else None,
                     dst_bits=bits,
                     dst_shift_offset=shift_offset,
                     symbol=v[0],
                     offset=v[3],
-                    pcrel=v[1] == OperandType.rellabel or instinfo.relsymimm,
+                    pcrel=v[1] in [OperandType.rellabel, OperandType.rellowlabel, OperandType.relhighlabel] or instinfo.relsymimm,
                 )
             )
 
