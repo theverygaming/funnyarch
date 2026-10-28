@@ -358,13 +358,18 @@ def get_operand_type(opstr):
         elif str[0] == "#":
             rval = int(str[1:], 0)
         else:
-            match = re.match(rf"^(?P<name>{REGXP_SYMNAME})(?:(?P<offsop>\+|-)(?P<offs>\d+))?$", re.sub(r"(?P<attr>\.rel|\.rel\.low|\.rel\.high|\.low|\.high)$", "", str))
+            match = re.match(rf"^(?P<name>{REGXP_SYMNAME})(?P<offsmath>(?:(?:\+|-)(?:\d+))+)?$", re.sub(r"(?P<attr>\.rel|\.rel\.low|\.rel\.high|\.low|\.high)$", "", str))
             if match is None:
                 raise Exception(f"could not match label {str}")
             isrellabel = str.endswith(".rel") or str.endswith(".rel.low") or str.endswith(".rel.high")
             islowlabel = str.endswith(".low")
             ishighlabel = str.endswith(".high")
-            extra = (({"+": 1, "-": -1}[match.group("offsop")]) * int(match.group("offs"))) if match.group("offs") is not None else 0
+            extra = (
+                sum([
+                    (({"+": 1, "-": -1}[m[0]]) * int(m[1]))
+                    for m in re.findall(r"(\+|-)(\d+)", match.group("offsmath"))
+                ]) if match.group("offsmath") is not None else 0
+            )
             islabel = not (isrellabel or islowlabel or ishighlabel)
             rval = match.group("name")
         return isreg, islabel, isrellabel, islowlabel, ishighlabel, rval, extra
