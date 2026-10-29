@@ -21,27 +21,7 @@ class Linker:
             if oldsymname in symbols_copy and symbols_copy[oldsymname].local:
                 return localprefix + oldsymname
             return oldsymname
-        for section_name, section in sections.items():
-            new_section_name = section_name
-            if section_name.startswith(".gnu.linkonce."):
-                if not section_name.startswith(".gnu.linkonce.t."):
-                    raise Exception(f"unsupported .gnu.linkonce section type '{section_name}'")
-                new_section_name = ".text"
-                if section_name in self._linked_linkonce_sections:
-                    if self._linked_linkonce_sections[section_name] != section.data:
-                        raise Exception(f"data in .gnu.linkonce section '{section_name}' differs")
-                    # added already, no need to do anything
-                    continue
-                self._linked_linkonce_sections[section_name] = section.data
-
-            if new_section_name not in self.sections:
-                self.sections[new_section_name] = objfmt.Section(bytearray())
-
-            # offset to add to new symbols / relocations
-            offset_add_new = len(self.sections[new_section_name].data)
-
-            self.sections[new_section_name].data += section.data
-
+        def _fixup_symbols(section_name, new_section_name, offset_add_new):
             for symbol_name, symbol in list(symbols.items()):
                 if symbol.section != section_name:
                     continue
@@ -60,7 +40,7 @@ class Linker:
                 self.symbols[symbol_name] = symbol
 
                 del symbols[oldsymbol_name]
-
+        def _fixup_relocations(section_name, new_section_name, offset_add_new):
             i = 0
             while i < len(relocations):
                 relocation = relocations[i]
@@ -82,6 +62,40 @@ class Linker:
 
                 self.relocations.append(relocation)
                 relocations.pop(i)
+        for section_name, section in sections.items():
+            new_section_name = section_name
+            if section_name.startswith(".gnu.linkonce."):
+                new_section_name = {
+                    "t": ".text",
+                    "r": ".rodata",
+                    "d": ".data",
+                    "b": ".bss",
+                }.get(section_name.split(".")[3])
+                if new_section_name is None:
+                    raise Exception(f"unsupported .gnu.linkonce section type '{section_name}'")
+                if section_name in self._linked_linkonce_sections:
+                    if self._linked_linkonce_sections[section_name]["data"] != section.data:
+                        raise Exception(f"data in .gnu.linkonce section '{section_name}' differs")
+                    # added already, no need to do anything.
+                    # resolve the symbols and relocations from this instance of the linkonce section with the offset from the previous
+                    _fixup_symbols(section_name, new_section_name, self._linked_linkonce_sections[section_name]["offset_add_new"])
+                    _fixup_relocations(section_name, new_section_name, self._linked_linkonce_sections[section_name]["offset_add_new"])
+                    continue
+                self._linked_linkonce_sections[section_name] = {
+                    "data": section.data,
+                    "offset_add_new": len(self.sections[new_section_name].data),
+                }
+
+            if new_section_name not in self.sections:
+                self.sections[new_section_name] = objfmt.Section(bytearray())
+
+            # offset to add to new symbols / relocations
+            offset_add_new = len(self.sections[new_section_name].data)
+
+            self.sections[new_section_name].data += section.data
+
+            _fixup_symbols(section_name, new_section_name, offset_add_new)
+            _fixup_relocations(section_name, new_section_name, offset_add_new)
 
         if symbols:
             raise Exception(f"could not process all symbols - leftover: {symbols}")
