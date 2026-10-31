@@ -4,9 +4,10 @@ import libar
 import json
 
 class Linker:
-    def __init__(self, ld_def):
+    def __init__(self, ld_def, additional_undefined_syms=None):
         self.ld_def = ld_def
         self.sections = {s["name"]: objfmt.Section(bytearray()) for s in self.ld_def["sections"]}
+        self.additional_undefined_syms = additional_undefined_syms or []
         self.symbols = {}
         self.relocations = []
         self.whole_archive = False
@@ -116,21 +117,21 @@ class Linker:
             return
         while True:
             objs_added = 0
-            unresolved = set(self._get_unresolved_symbol_names())
+            unresolved = set(self._get_unresolved_symbol_names(with_additional_undefined=True))
             for fname, (sections, symbols, relocations) in list(objfiles.items()):
                 if len(unresolved.intersection(symbols.keys())) == 0:
                     continue
                 print(f"adding archive member '{fname}'")
                 self.add_input(sections, symbols, relocations)
                 # update unresolved, we may be able to resolve more from the freshly added object files in this same run
-                unresolved = set(self._get_unresolved_symbol_names())
+                unresolved = set(self._get_unresolved_symbol_names(with_additional_undefined=True))
                 objs_added += 1
                 del objfiles[fname]
             if objs_added == 0:
                 break
 
-    def _get_unresolved_symbol_names(self):
-        referenced = set()
+    def _get_unresolved_symbol_names(self, with_additional_undefined=False):
+        referenced = set(self.additional_undefined_syms if with_additional_undefined else [])
         for reloc in self.relocations:
             if isinstance(reloc, objfmt.RelocationSymbol):
                 referenced.add(reloc.symbol)
@@ -288,6 +289,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-T", "--script", metavar="script", help="linker script (JSON)", type=str
     )
+    parser.add_argument("-u", "--undefined", help="force symbols to be included in the output (useful for including specific parts of the standard library)", type=str, action="append")
     args, remaining_args = parser.parse_known_args()
 
     ldscript = {
@@ -305,8 +307,7 @@ if __name__ == "__main__":
         print(f"using linker script '{args.script}'")
         with open(args.script, "r", encoding="utf-8") as f:
             ldscript = json.loads(f.read())
-
-    ld = Linker(ldscript)
+    ld = Linker(ldscript, additional_undefined_syms=args.undefined)
 
     for inf in remaining_args:
         if inf == "--whole-archive":
