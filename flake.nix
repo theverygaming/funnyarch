@@ -109,6 +109,7 @@
             pkgs.libmpc
             pkgs.flex
             pkgs.bison
+            pkgs.gnat16
           ];
 
           hardeningDisable = [ "format" ];
@@ -127,7 +128,7 @@
             "--target=funnyarch-none-none"
             "--disable-nls"
             "--disable-multilib"
-            "--enable-languages=c,c++"
+            "--enable-languages=c,c++,ada"
             "--without-gnu-as"
             "--with-as=${packages.toolchain}/bin/funnyarch-none-none-as"
             "--without-gnu-ld"
