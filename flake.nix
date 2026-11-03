@@ -86,17 +86,24 @@
         packages.gcc = pkgs.stdenv.mkDerivation rec {
           name = "gcc-funnyarch-none-none";
 
-          src = pkgs.fetchFromGitHub {
-            owner = "theverygaming";
-            repo = "gcc";
-            rev = "4f5bebe181fdd0414e395902c30954b3f2622081";
-            sha256 = "sha256-38OGAwvL9rqKcvNtjp98sRFBUOoOBEbTO8+HVXKkOwE=";
+          src = pkgs.fetchurl {
+            url = "https://ftp.fu-berlin.de/unix/languages/gcc/releases/gcc-16.2.0/gcc-16.2.0.tar.xz";
+            sha256 = "sha256-5nOOKVl/czJwcxqpBgDzf/3ARQed/CfsfoGSzIEIXD4=";
           };
+
+          patches = [
+            # fetchpatch somehow breaks the patch so??? we just use fetchurl fuck it
+            (pkgs.fetchurl {
+              name = "funnyarch.patch";
+              url = "https://github.com/theverygaming/gcc/compare/1b961bf9d7e76de9a36f93d8749dbe7fae302246...4f5bebe181fdd0414e395902c30954b3f2622081.patch";
+              sha256 = "sha256-qwfsd7LY+eB84k7+rrla8CIZuSTyIqUy5EW14rzNOpM=";
+            })
+          ];
 
           # somehow breaks our config.sub modifications???
           updateAutotoolsGnuConfigScriptsPhase = "true";
 
-          buildInputs = [
+          nativeBuildInputs = [
             pkgs.gmp
             pkgs.mpfr
             pkgs.libmpc
@@ -126,8 +133,8 @@
             "--without-gnu-ld"
             "--with-ld=${packages.toolchain}/bin/funnyarch-none-none-ld"
             "--prefix=/"
-            "AR_FOR_TARGET=ar"
-            "RANLIB_FOR_TARGET=ranlib"
+            "AR_FOR_TARGET=${pkgs.stdenv.cc.bintools}/bin/ar"
+            "RANLIB_FOR_TARGET=${pkgs.stdenv.cc.bintools}/bin/ranlib"
           ];
 
           buildPhase = ''
