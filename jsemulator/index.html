@@ -16,7 +16,7 @@
             rom.set(romData);
             let hdd = new Uint8Array(hddData.length + (512 - (hddData.length % 512)));
             hdd.set(hddData);
-            const computer = new funnyarchComputer(rom, new Uint8Array(4096), serialcon.addText.bind(serialcon), document.getElementById("screen"), hdd);
+            const computer = new funnyarchComputer(rom, new Uint8Array(12288), serialcon.addText.bind(serialcon), document.getElementById("screen"), hdd);
 
             const runner = new animationFrameCompute(
                 () => {
