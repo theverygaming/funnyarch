@@ -8,7 +8,7 @@ class funnyarchHDD {
         if ((dataArray.length % 512) != 0) {
             throw new Error("HDD size must be divisible by 512");
         }
-        
+
         this.dataArray = dataArray;
 
         // state
@@ -86,13 +86,13 @@ class funnyarchComputer {
         if (!(ramArray instanceof Uint8Array)) {
             throw new Error("Invalid ramArray type");
         }
-        if (romArray.length != 8192) {
+        if (romArray.length > 4096 * 100) {
             throw new Error("Invalid romArray size");
         }
 
         this.memoryArrays = []
-        this.memoryArrays.push({ "arr": romArray, "baseAddr": 0x00, "readonly": true });
-        this.memoryArrays.push({ "arr": ramArray, "baseAddr": 0x2000, "readonly": false });
+        this.memoryArrays.push({ "arr": romArray, "baseAddr": 0x00000000, "readonly": true });
+        this.memoryArrays.push({ "arr": ramArray, "baseAddr": 0x01000000, "readonly": false });
         this.serialOut = serialOut;
         this.screenCanvas = screenCanvas;
 
