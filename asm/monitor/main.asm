@@ -5,8 +5,12 @@ rjmp main
 
 #include "macros.asm"
 
-#define LINE_BUFFER_BEGIN 0x2100
-#define LINE_BUFFER_END 0x2140
+#define STACK_LOW 0x0100
+#define STACK_HIGH 0x0100
+#define LINE_BUFFER_BEGIN_LOW 0x0100
+#define LINE_BUFFER_BEGIN_HIGH 0x0100
+#define LINE_BUFFER_END_LOW 0x0140
+#define LINE_BUFFER_END_HIGH 0x0100
 
 // r10 = current memory location
 // r11 = next memory location
@@ -17,7 +21,8 @@ mtsr pcst, r0
 mov r0, entry
 or r0, r0, #0x1 // no jump table
 mtsr ibptr, r0
-mov rsp, #0x2100
+mov rsp, #STACK_LOW
+movh rsp, #STACK_HIGH
 push(lr)
 mov r0, #0x5C // '\'
 rcall(write_serial)
@@ -31,7 +36,8 @@ mov r11, #0
 procloop:
 push(lr)
 rcall(readline)
-mov r0, #LINE_BUFFER_BEGIN
+mov r0, #LINE_BUFFER_BEGIN_LOW
+movh r0, #LINE_BUFFER_BEGIN_HIGH
 _procloop_continue_reading_line:
 mov r3, r0
 rcall(buffer_atoi)
@@ -206,10 +212,15 @@ ret
 
 
 // reads from serial until line break
-// trashes: r0, r1, r2
+// trashes: r0, r1, r2, r3, r4
 readline:
 push(lr)
-mov r2, #LINE_BUFFER_BEGIN
+mov r2, #LINE_BUFFER_BEGIN_LOW
+movh r2, #LINE_BUFFER_BEGIN_HIGH
+mov r3, #LINE_BUFFER_END_LOW
+movh r3, #LINE_BUFFER_END_HIGH
+mov r4, #LINE_BUFFER_BEGIN_LOW
+movh r4, #LINE_BUFFER_BEGIN_HIGH
 _readline_loop:
 
 rcall(read_serial)
@@ -227,11 +238,12 @@ ifeq rjmp _readline_backspace
 rcall(write_serial)
 
 add r2, #1
-cmp r2, #LINE_BUFFER_END
-ifgteq mov r2, #LINE_BUFFER_BEGIN
+cmp r2, r3
+ifgteq mov r2, #LINE_BUFFER_BEGIN_LOW
+ifgteq movh r2, #LINE_BUFFER_BEGIN_HIGH
 rjmp _readline_loop
 _readline_backspace:
-cmp r2, #LINE_BUFFER_BEGIN
+cmp r2, r4
 ifgt sub r2, #1
 ifgt rjal write_serial
 rjmp _readline_loop
