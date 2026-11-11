@@ -39,7 +39,8 @@ main:
   mov r0, entry
   or r0, r0, #0x1 // no jump table
   mtsr ibptr, r0
-  mov rsp, #0x2100
+  mov rsp, #0x0100
+  movh rsp, #0x0100
   push(lr)
 
   // initialize variables
