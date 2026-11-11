@@ -5,8 +5,10 @@ memsize:
 .regalias r3 tmp1
 .regalias r4 end_addr
 .regalias r10 total_mem_bytes
-mov begin_addr, #0x2000 // begin address
+mov begin_addr, #0x0000 // begin address
+movh begin_addr, #0x0100
 mov end_addr, #0xFFFF // end address
+movh end_addr, #0x0400
 mov total_mem_bytes, #0
 mov current_addr, begin_addr
 .memsize_loop:

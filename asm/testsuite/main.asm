@@ -10,7 +10,8 @@ rjmp main
 main:
 mov r0, #0b1 // set alignment flag
 mtsr pcst, r0
-mov rsp, #0x23E0
+mov rsp, #0x03E0
+movh rsp, #0x0100
 mov r0, int_handler
 or r0, r0, #0x1 // no jump table
 mtsr ibptr, r0
