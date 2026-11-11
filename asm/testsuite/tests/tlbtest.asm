@@ -1,3 +1,4 @@
+// NOTE: this test requires at least 12KiB of RAM to run (to avoid TLB collisions, since it just stores everything in the TLB instead of having real page filler code)
 tlbtest_int_handler:
 mtsr scr0, r0
 mtsr scr1, r1
@@ -56,7 +57,9 @@ mov r1, #0x1000
 mov r2, #0
 tlbw r0, r1, r2
 mov r0, #0x2000
+movh r0, #0x0100
 mov r1, #0x2000
+movh r1, #0x0100
 mov r2, #0
 tlbw r0, r1, r2
 
@@ -81,7 +84,9 @@ mov r1, #0x1000
 mov r2, #0
 tlbw r0, r1, r2
 mov r0, #0x2000
+movh r0, #0x0100
 mov r1, #0x2000
+movh r1, #0x0100
 mov r2, #0
 tlbw r0, r1, r2
 
@@ -113,18 +118,20 @@ cmp r26, #5
 ifneq rjmp .tlbtest_failed
 
 // map the address
-mov r1, #0x0040
+mov r1, #0x5040
 movh r1, #0xF000
 mov r0, #0x2000
+movh r0, #0x0100
 mov r2, #0
 tlbw r0, r1, r2
 
-// write some random data to 0x2004
+// write some random data to 0x01002004
 mov r0, #0x2004
+movh r0, #0x0100
 str r0, r0, #0
 
 // access it again, expecting everything to work fine
-mov r0, #0x0004
+mov r0, #0x5004
 movh r0, #0xF000
 str r0, r0, #0
 stri r0, r0, #0
@@ -140,7 +147,7 @@ cmp r26, #5
 ifneq rjmp .tlbtest_failed
 
 // r0 should still contain the same address
-mov r1, #0x0004
+mov r1, #0x5004
 movh r1, #0xF000
 cmp r1, r0
 ifneq rjmp .tlbtest_failed
@@ -149,14 +156,15 @@ ifneq rjmp .tlbtest_failed
 mov r0, #0x0 // TLB disabled
 mtsr pcst, r0
 
-mov r0, #0x0004
+mov r0, #0x5004
 movh r0, #0xF000
-// 0xF0000004 should now contain different data since the TLB is disabled
+// 0xF0005004 should now contain different data since the TLB is disabled
 ldr r1, r0, #0
 cmp r1, r0
 ifeq rjmp .tlbtest_failed
-// 0x2004 should now contain the data we wrote to 0xF0000004
+// 0x01002004 should now contain the data we wrote to 0xF0005004
 mov r2, #0x2004
+movh r2, #0x0100
 ldr r1, r2, #0
 cmp r1, r0
 ifneq rjmp .tlbtest_failed
@@ -165,6 +173,8 @@ mov r1, #0
 rjmp .tlbtest_finish
 
 .tlbtest_failed:
+mov r0, #0x0 // TLB disabled
+mtsr pcst, r0
 mov r1, #1
 .tlbtest_finish:
 pop(r0)
