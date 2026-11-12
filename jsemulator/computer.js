@@ -180,7 +180,8 @@ class funnyarchComputer {
         if (address >= 0 && (address + 3) < array.length) {
             return ((array[address + 0] << 0) | (array[address + 1] << 8) | (array[address + 2] << 16) | (array[address + 3] << 24)) >>> 0;
         }
-        throw new Error("readMemArray invalid address");
+        //throw new Error("readMemArray invalid address");
+        return 0;
     }
 
     #writeMemArray(array, address, data) {
@@ -190,7 +191,7 @@ class funnyarchComputer {
             array[address + 2] = (data >>> 16) & 0xFF;
             array[address + 3] = (data >>> 24) & 0xFF;
         } else {
-            throw new Error("writeMemArray invalid address");
+            //throw new Error("writeMemArray invalid address");
         }
     }
 }
