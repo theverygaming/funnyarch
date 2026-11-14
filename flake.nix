@@ -38,6 +38,10 @@
             cp -r linker.py "$out/bin/funnyarch-none-none-ld"
             cp -r objcopy.py "$out/bin/funnyarch-none-none-objcopy"
             cp -r nm.py "$out/bin/funnyarch-none-none-nm"
+
+            # standard system ar & ranlib work just fine!
+            ln -s "${pkgs.binutils}/bin/ar" "$out/bin/funnyarch-none-none-ar"
+            ln -s "${pkgs.binutils}/bin/ranlib" "$out/bin/funnyarch-none-none-ranlib"
           '';
         };
         packages.rom = pkgs.stdenv.mkDerivation rec {
