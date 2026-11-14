@@ -540,22 +540,34 @@ def parse_assembler_directive(str, include_paths):
             return
         except ValueError:
             pass
-        match = re.match(rf"^(?P<name1>{REGXP_SYMNAME})(?:(?P<offsop>\-)(?P<name2>{REGXP_SYMNAME}))?$", s)
+        match = re.match(rf"^(?P<name1>{REGXP_SYMNAME})(?:(?P<offsop>\-|\+)(?:(?P<offs2>\d+)|(?P<name2>{REGXP_SYMNAME})))?$", s)
         if match is None:
             raise Exception(f"could not match const {s}")
+        reloc_vals_common = {
+            "section": current_section,
+            "section_offset": len(sections[current_section].data),
+            "pre1_rshift": None,
+            "pre2_mask": None,
+            "dst_bits": nbytes * 8,
+            "dst_shift_offset": None,
+        }
         if match.group("name2") is not None:
             if match.group("offsop") != "-":
                 raise Exception("unknown offset operator")
             relocations.append(
                 objfmt.RelocationSymbolDiff(
-                    section=current_section,
-                    section_offset=len(sections[current_section].data),
-                    pre1_rshift=None,
-                    pre2_mask=None,
-                    dst_bits=nbytes*8,
-                    dst_shift_offset=None,
+                    **reloc_vals_common,
                     symbola=match.group("name1"),
                     symbolb=match.group("name2"),
+                )
+            )
+        elif match.group("offs2") is not None:
+            relocations.append(
+                objfmt.RelocationSymbol(
+                    **reloc_vals_common,
+                    symbol=match.group("name1"),
+                    offset=(1 if match.group("offsop") == "+" else -1) * int(match.group("offs2")),
+                    pcrel=False,
                 )
             )
         else:
